@@ -20,10 +20,12 @@ FILE_OUT_path = "results"
 FILE_OUT_prefix = "REP"
 
 REPETITIONS = 10
+OVERWRITE = False
 
 if not os.path.exists(FILE_OUT_path):
     os.makedirs(FILE_OUT_path)
 
+# 1920 outfiles
 for rep in range(REPETITIONS):
     for reputation_min in REPUTATION_MIN_arr:
         for ratio_malicious in RATIO_MALICIOUS_arr:
@@ -43,15 +45,17 @@ for rep in range(REPETITIONS):
 
                     print("Going for " + filepath)
 
-                    process = Popen([
-                        'python3', 
-                        'reputation.py',
-                        str(reputation_min),
-                        str(ratio_malicious),
-                        str(alpha),
-                        str(tolerance),
-                        str(filepath)
-                    ])
-                    stdout, stderr = process.communicate()
+                    if OVERWRITE or not os.path.exists(filepath):
+
+                        process = Popen([
+                            'python3', 
+                            'reputation.py',
+                            str(reputation_min),
+                            str(ratio_malicious),
+                            str(alpha),
+                            str(tolerance),
+                            str(filepath)
+                        ])
+                        stdout, stderr = process.communicate()
                 
                 
