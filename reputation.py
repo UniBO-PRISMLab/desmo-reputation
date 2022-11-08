@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from tqdm import tqdm
 
@@ -163,10 +164,15 @@ if __name__ == "__main__":
     # Get parameters from ARGV
     
     # REPUTATION_MIN
+    REPUTATION_MIN = float(sys.argv[1])
     # RATIO_MALICIOUS
+    RATIO_MALICIOUS = float(sys.argv[2])
     # ALPHA
+    ALPHA = float(sys.argv[3])
     # TOLERANCE
+    TOLERANCE = float(sys.argv[4])
     # FILE
+    FILE_OUT = sys.argv[5]
 
     # Number of sources present at cold start and its dual 
     S_0 = int(S * RATIO_COLD_START)
