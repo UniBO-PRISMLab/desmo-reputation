@@ -45,6 +45,14 @@ for rep in range(REPETITIONS):
 
                     print("Going for " + filepath)
 
+                    if os.path.exists(filepath):
+                        with open(filepath, 'r') as tempfile:
+                            for count, line in enumerate(tempfile):
+                                pass
+                    if not (count + 1) == 10000:
+                        os.remove(filepath)
+            
+
                     if OVERWRITE or not os.path.exists(filepath):
 
                         process = Popen([
