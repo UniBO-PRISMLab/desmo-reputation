@@ -192,7 +192,7 @@ if __name__ == "__main__":
                 candidates_indices = indices
 
             # Generate sample for each of the Candidates
-            assert len(candidates_indices) == S_req
+            # assert len(candidates_indices) == S_req
             trusted_indices = []
             for _i in candidates_indices:
                 Ranking[_i].generateSample()
