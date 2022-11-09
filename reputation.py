@@ -54,28 +54,6 @@ ALPHA = 0.5 # Number of epochs
 # FILE where to write the results
 FILE_OUT = "REP.csv"
 
-''' 
-    Plot1 :
-    x- ratio of malicious
-    y- how long till i kick them out
-    hue - alpha?
-
-    How close the consensus is to the ground truth
-
-    Plot2 : 
-    x- ratio of malicious
-    y- accuracy malicious/benign
-    hue - tolerance?
-
-    Plot3 : 
-    x- tempo
-    y- reputazione
-    hue - malicious/benign
-
-    Simulare bursts di maligni 
-        -> solidita del sistema con 50%+ di maligni
-'''
-
 # Ranking Master Array
 Ranking = []
 
@@ -207,7 +185,11 @@ if __name__ == "__main__":
             # Maybe exploration vs exploitation? Boltzmann Equation?
             weights = [(_i.reputation + 1.0) for _i in Ranking]
             indices = np.arange(len(Ranking))
-            candidates_indices = np.random.choice(indices, S_req, p=(weights/np.sum(weights)), replace=False)
+            if len(indices) < S_req: 
+                candidates_indices = np.random.choice(indices, S_req, p=(weights/np.sum(weights)), replace=False)
+            else:
+                # This happens if I kicked out so many sources that I need to take them all
+                candidates_indices = indices
 
             # Generate sample for each of the Candidates
             assert len(candidates_indices) == S_req
