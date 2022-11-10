@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from tqdm import tqdm
 
-_TESTING_ = False
+_TESTING_ = True
 _DEBUG_ = False
 source_incremental_idx = 1
 
@@ -256,8 +256,8 @@ if __name__ == "__main__":
         printRanking(Ranking, verbose=True, header="Ranking: ")
         printRanking(Banlist, verbose=True, header="Banlist: ")
 
-    print("Precision: {}".format(counter_banned_malign / counter_banned_sources))
-    print("Recall {}".format(counter_banned_malign / counter_malign))
+    print("Precision: {}".format( (counter_banned_malign / counter_banned_sources) if counter_banned_sources else 0 ))
+    print("Recall {}".format( (counter_banned_malign / counter_malign) if counter_malign else 0 ))
     
 
 
