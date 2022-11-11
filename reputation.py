@@ -1,10 +1,17 @@
-import sys
+import sys, os
 import numpy as np
 from tqdm import tqdm
 
-_TESTING_ = False
+_TESTING_ = True
 _DEBUG_ = False
 source_incremental_idx = 1
+
+# ALGORITHMS
+ALGO_AVG = 0         # Computes only the average
+ALGO_MED = 1         # Computes the median and uses the ranking
+ALGO_REP = 2         # Our reputation algorithm
+
+ALGO = ALGO_REP
 
 # Total number of sources
 S = 1000 
@@ -20,7 +27,7 @@ RATIO_EPOCHS_ARRIVALS = 0.5
 # Ratio of sources present at cold start (between 0 and 1)
 RATIO_COLD_START = 0.5
 
-# Ratio of sources present at cold start (between 0 and 1)
+# Ratio of malicious sources within the remaining ones (between 0 and 1)
 RATIO_MALICIOUS = 0.3
 
 # Number of sources chosen for a single request
@@ -55,6 +62,8 @@ ALPHA = 0.5 # Number of epochs
 FILE_OUT = "REP.csv"
 
 # Ranking Master Array
+Ranking_avg = []
+
 Ranking = []
 
 # Banned Master Array
@@ -76,7 +85,20 @@ def calculateScore(error):
 
 # Find a single value to elect as the Predicted truth.
 # Value matrix are the actual values given by the candidates
-def runConsensus(value_matrix):
+def runConsensus(value_matrix, algo=ALGO_REP):
+
+    if (algo == ALGO_AVG):
+        result = np.nanmean(value_matrix)
+        print(value_matrix, result)
+        return result if result else 0
+        
+
+    if (algo == ALGO_MED):
+        result = np.nanmedian(value_matrix)
+        print(value_matrix, result)
+        return result if result else 0
+
+    # PROPOSED ALGORITHM BEGIN
 
     # The matrix of values aligned on time
     sync_matrix = value_matrix # FIXME time processing is missing
@@ -141,16 +163,19 @@ if __name__ == "__main__":
 
     # Get parameters from ARGV
     
-    # REPUTATION_MIN
-    REPUTATION_MIN = float(sys.argv[1])
-    # RATIO_MALICIOUS
-    RATIO_MALICIOUS = float(sys.argv[2])
-    # ALPHA
-    ALPHA = float(sys.argv[3])
-    # TOLERANCE
-    TOLERANCE = float(sys.argv[4])
-    # FILE
-    FILE_OUT = sys.argv[5]
+    if len(sys.argv) >= 6:
+        # REPUTATION_MIN
+        REPUTATION_MIN = float(sys.argv[1])
+        # RATIO_MALICIOUS
+        RATIO_MALICIOUS = float(sys.argv[2])
+        # ALPHA
+        ALPHA = float(sys.argv[3])
+        # TOLERANCE
+        TOLERANCE = float(sys.argv[4])
+        # FILE
+        FILE_OUT = sys.argv[5]
+        # ALGO
+        ALGO = sys.argv[6]
 
     # Number of sources present at cold start and its dual 
     S_0 = int(S * RATIO_COLD_START)
@@ -168,8 +193,11 @@ if __name__ == "__main__":
     counter_banned_sources = 0
     counter_banned_malign = 0
     
+    # try:
+
     # EPOCH START
     with open(FILE_OUT, 'a') as outfile:
+
         for epoch in tqdm(range(N_EPOCHS)):
 
             # Generate new sources if the time has come - evaluate if malicious
@@ -183,7 +211,10 @@ if __name__ == "__main__":
                 
             # Pick candidates for the next measurement FIXME not fair
             # Maybe exploration vs exploitation? Boltzmann Equation?
-            weights = [(_i.reputation + 1.0) for _i in Ranking]
+            if ALGO == ALGO_AVG:
+                weights = [1.0 for _i in Ranking] # Algo average does not care about the weights nor the ranking
+            else:
+                weights = [(_i.reputation + 1.0) for _i in Ranking]
             indices = np.arange(len(Ranking))
             if len(indices) >= S_req: 
                 candidates_indices = np.random.choice(indices, S_req, p=(weights/np.sum(weights)), replace=False)
@@ -200,14 +231,14 @@ if __name__ == "__main__":
             for _i in candidates_indices:
                 Ranking[_i].generateSample()
                 # Pick candidates indices for which there is no null value
-                if all(not isNull(_val) for _val in Ranking[_i].lastGeneratedSample):
+                if all(not isNull(_val) for _val in Ranking[_i].lastGeneratedSample) or (ALGO == ALGO_AVG):
                     trusted_indices.append(_i)
 
             # Pick the best value [CONSENSUS] excluding the defective ones
             # What if everyone gave a nan response?
             if len(trusted_indices) > 0:
-                value_matrix = np.matrix([ Ranking[_i].lastGeneratedSample for _i in trusted_indices ])
-                consensus = runConsensus(value_matrix)
+                value_matrix = np.array([ Ranking[_i].lastGeneratedSample for _i in trusted_indices ])
+                consensus = runConsensus(value_matrix, algo=ALGO)
             else:
                 consensus = 0
             if _DEBUG_:
@@ -217,7 +248,7 @@ if __name__ == "__main__":
             for _i in candidates_indices:
                 # If all values are not None
                 if _i in trusted_indices:
-                    diff_from_consensus = np.min( np.absolute(Ranking[_i].lastGeneratedSample - consensus) )
+                    diff_from_consensus = np.nanmin( np.absolute(Ranking[_i].lastGeneratedSample - consensus) )
                     Ranking[_i].last_score = calculateScore(diff_from_consensus)
                 else:
                     Ranking[_i].last_score = -1
@@ -233,14 +264,15 @@ if __name__ == "__main__":
             Ranking.sort(key=lambda x: x.reputation, reverse=True)
 
             # Kick out the misbehaving
-            for _i, _source in enumerate(Ranking):
-                if _source.reputation < REPUTATION_MIN:
-                    Banlist.append(Ranking.pop(_i))
-                    counter_banned_sources += 1
-                    if not _source.trusted:
-                        counter_banned_malign += 1
+            if ALGO == ALGO_REP:
+                for _i, _source in enumerate(Ranking):
+                    if _source.reputation < REPUTATION_MIN:
+                        Banlist.append(Ranking.pop(_i))
+                        counter_banned_sources += 1
+                        if not _source.trusted:
+                            counter_banned_malign += 1
             
-           
+        
             # Report onto the file
             avg_reputation_benign = ( float(sum([x.reputation for x in (Ranking + Banlist) if x.trusted])) / float(counter_sources - counter_malign) ) if counter_sources else 0.0
             avg_reputation_malign = ( float(sum([x.reputation for x in (Ranking + Banlist) if not x.trusted])) / float(counter_malign) ) if counter_malign else 0.0
@@ -264,6 +296,9 @@ if __name__ == "__main__":
 
     print("Precision: {}".format( (counter_banned_malign / counter_banned_sources) if counter_banned_sources else 0 ))
     print("Recall {}".format( (counter_banned_malign / counter_malign) if counter_malign else 0 ))
-    
+
+    # except Exception as e:
+    #     print (e)
+    #     os.remove(FILE_OUT)     
 
 
