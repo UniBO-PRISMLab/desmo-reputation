@@ -3,26 +3,26 @@ from subprocess import Popen, PIPE
 
 # REPUTATION_MIN
 REPUTATION_MIN_arr = [-0.8, -0.6, -0.4, -0.2]
-REPUTATION_MIN_arr = [-0.6, -0.4]
+#REPUTATION_MIN_arr = [-0.6, -0.4]
 
 # RATIO_MALICIOUS
 RATIO_MALICIOUS_arr = [0.25, 0.5, 0.75, 1.0]
-RATIO_MALICIOUS_arr = [0.25, 0.75]
+#RATIO_MALICIOUS_arr = [0.25, 0.75]
 
 # ALPHA
 ALPHA_arr = [0.1, 0.3, 0.5, 0.7]
-ALPHA_arr = [0.5]
+#ALPHA_arr = [0.5]
 
 # TOLERANCE
 TOLERANCE_arr = [3.0, 1.0, 5.0]
-TOLERANCE_arr = [3.0]
+#TOLERANCE_arr = [3.0]
 
 # FILE
 FILE_OUT_path = "results"
 FILE_OUT_prefix = "REP"
 
 REPETITIONS = 10
-REPETITIONS = 1
+#REPETITIONS = 1
 
 OVERWRITE = False
 
@@ -51,9 +51,10 @@ for rep in range(REPETITIONS):
 
                     if os.path.exists(filepath):
                         with open(filepath, 'r') as tempfile:
+                            count = 0
                             for count, line in enumerate(tempfile):
                                 pass
-                        if not (count + 1) == 20:
+                        if not (count + 1) == 10000:
                             os.remove(filepath)
                             print("Replacing " + filepath)
             

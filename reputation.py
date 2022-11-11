@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from tqdm import tqdm
 
-_TESTING_ = True
+_TESTING_ = False
 _DEBUG_ = False
 source_incremental_idx = 1
 
@@ -185,11 +185,14 @@ if __name__ == "__main__":
             # Maybe exploration vs exploitation? Boltzmann Equation?
             weights = [(_i.reputation + 1.0) for _i in Ranking]
             indices = np.arange(len(Ranking))
-            if len(indices) < S_req: 
+            if len(indices) >= S_req: 
                 candidates_indices = np.random.choice(indices, S_req, p=(weights/np.sum(weights)), replace=False)
             else:
                 # This happens if I kicked out so many sources that I need to take them all
                 candidates_indices = indices
+            # What if empty ranking?
+            if len(indices) <= 0:
+                continue
 
             # Generate sample for each of the Candidates
             # assert len(candidates_indices) == S_req
@@ -199,11 +202,14 @@ if __name__ == "__main__":
                 # Pick candidates indices for which there is no null value
                 if all(not isNull(_val) for _val in Ranking[_i].lastGeneratedSample):
                     trusted_indices.append(_i)
-            
 
             # Pick the best value [CONSENSUS] excluding the defective ones
-            value_matrix = np.matrix([ Ranking[_i].lastGeneratedSample for _i in trusted_indices ])
-            consensus = runConsensus(value_matrix)
+            # What if everyone gave a nan response?
+            if len(trusted_indices) > 0:
+                value_matrix = np.matrix([ Ranking[_i].lastGeneratedSample for _i in trusted_indices ])
+                consensus = runConsensus(value_matrix)
+            else:
+                consensus = 0
             if _DEBUG_:
                 print("\tCONSENSUS: " + str(consensus))
 
