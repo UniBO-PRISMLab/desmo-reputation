@@ -2,7 +2,7 @@ import sys, os
 import numpy as np
 from tqdm import tqdm
 
-_TESTING_ = True
+_TESTING_ = False
 _DEBUG_ = False
 source_incremental_idx = 1
 
