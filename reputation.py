@@ -90,13 +90,11 @@ def runConsensus(value_matrix, algo=ALGO_REP):
 
     if (algo == ALGO_AVG):
         result = np.nanmean(value_matrix)
-        print(value_matrix, result)
         return result if result else 0
         
 
     if (algo == ALGO_MED):
         result = np.nanmedian(value_matrix)
-        print(value_matrix, result)
         return result if result else 0
 
     # PROPOSED ALGORITHM BEGIN
