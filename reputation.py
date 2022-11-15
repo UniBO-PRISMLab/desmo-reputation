@@ -10,6 +10,7 @@ source_incremental_idx = 1
 ALGO_AVG = 0         # Computes only the average
 ALGO_MED = 1         # Computes the median and uses the ranking
 ALGO_REP = 2         # Our reputation algorithm
+ALGO_LIST = ["Average", "Median + Ranking", "Reputation"]
 
 ALGO = ALGO_REP
 
@@ -175,7 +176,7 @@ if __name__ == "__main__":
         # FILE
         FILE_OUT = sys.argv[5]
         # ALGO
-        ALGO = sys.argv[6]
+        ALGO = int(sys.argv[6])
 
     # Number of sources present at cold start and its dual 
     S_0 = int(S * RATIO_COLD_START)
@@ -194,6 +195,7 @@ if __name__ == "__main__":
     counter_banned_malign = 0
     
     # try:
+    print("Algorithm: " + ALGO_LIST[ALGO])
 
     # EPOCH START
     with open(FILE_OUT, 'a') as outfile:

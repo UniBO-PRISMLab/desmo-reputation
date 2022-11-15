@@ -33,12 +33,13 @@ if not os.path.exists(FILE_OUT_path):
     os.makedirs(FILE_OUT_path)
 
 # 1920 outfiles
-for algo in ALGO:
-    for rep in range(REPETITIONS):
-        for reputation_min in REPUTATION_MIN_arr:
-            for ratio_malicious in RATIO_MALICIOUS_arr:
-                for alpha in ALPHA_arr:
-                    for tolerance in TOLERANCE_arr:
+
+for rep in range(REPETITIONS):
+    for reputation_min in REPUTATION_MIN_arr:
+        for ratio_malicious in RATIO_MALICIOUS_arr:
+            for alpha in ALPHA_arr:
+                for tolerance in TOLERANCE_arr:
+                    for algo in ALGO:
 
                         filepath = os.path.join(FILE_OUT_path, 
                             "_".join([
