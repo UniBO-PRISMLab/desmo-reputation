@@ -249,7 +249,7 @@ if __name__ == "__main__":
                 # If all values are not None
                 if _i in trusted_indices:
                     diff_from_consensus = np.nanmin( np.absolute(Ranking[_i].lastGeneratedSample - consensus) )
-                    Ranking[_i].last_score = calculateScore(diff_from_consensus) if diff_from_consensus else -1 # Avoid all-NaN slice
+                    Ranking[_i].last_score = calculateScore(diff_from_consensus) if not np.isnan(diff_from_consensus).all() else -1 # Avoid all-NaN slice
                 else:
                     Ranking[_i].last_score = -1
 
