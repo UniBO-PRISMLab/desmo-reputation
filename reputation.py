@@ -34,7 +34,7 @@ RATIO_DEFECTIVE = 0.05
 DEFECTIVE = False
 
 # This should be one of uniform or bursty
-ARRIVAL_RATE = 'uniform'
+ARRIVAL_RATE = 'bursty'
 
 # Number of sources chosen for a single request
 S_req = 10
@@ -188,14 +188,30 @@ if __name__ == "__main__":
         FILE_OUT = sys.argv[5]
         # ALGO
         ALGO = int(sys.argv[6])
+        # Arrival Rate
+        ARRIVAL_RATE = sys.argv[7]
 
     # Number of sources present at cold start and its dual 
     S_0 = int(S * RATIO_COLD_START)
     S_remainder = S - S_0
 
-    # Array of arrival
+    # Array of arrival and of malicious
     arrivals = np.random.randint(0, high=N_EPOCHS*RATIO_EPOCHS_ARRIVALS, size=S_remainder)
     arrivals.sort()
+    arrivals_malicious = np.zeros(S_remainder)
+    # Put ones where malicious are
+    if ARRIVAL_RATE == 'uniform':
+        # pick a sample of them with respect to RATIO_MALICIOUS
+        for _idx in np.random.choice(np.arange(S_remainder), int(RATIO_MALICIOUS * S_remainder), replace=False):
+            arrivals_malicious[_idx] = 1.0
+    elif ARRIVAL_RATE == 'bursty':
+        # pick one epoch where the burst takes place and force the next malicious one to happen all at once
+        _burst = np.random.randint(S_remainder - int(RATIO_MALICIOUS * S_remainder) + 1)
+        for _idx_mal in range(int(RATIO_MALICIOUS * S_remainder)):
+            arrivals_malicious[_burst + _idx_mal] = 1.0
+            arrivals[_burst + _idx_mal] = arrivals[_burst]
+    else:
+        sys.exit(0)
 
     # Fill up the list of sources
     for _i in range(S_remainder):
@@ -216,9 +232,10 @@ if __name__ == "__main__":
 
             # Generate new sources if the time has come - evaluate if malicious
             while (len(arrivals) > 0 and epoch == arrivals[0]):
-                _trusted = (np.random.rand() >= RATIO_MALICIOUS)
+                _trusted = (arrivals_malicious[0] == 0.0) #(np.random.rand() >= RATIO_MALICIOUS)
                 Ranking.append(Source(trusted = _trusted ))
                 arrivals = np.delete(arrivals, 0)
+                arrivals_malicious = np.delete(arrivals_malicious, 0)
                 counter_sources += 1
                 if not _trusted:
                     counter_malign += 1
