@@ -17,19 +17,24 @@ ALGO = ALGO_REP
 # Total number of sources
 S = 1000 
 if _TESTING_:
-    S = 20
+    S = 40
 
 # Number of Epochs (the ratio for arrivals is the ratio of epochs in which we add up sources)
 N_EPOCHS = 10000
 if _TESTING_:
-    N_EPOCHS = 20
+    N_EPOCHS = 40
 RATIO_EPOCHS_ARRIVALS = 0.5
 
 # Ratio of sources present at cold start (between 0 and 1)
 RATIO_COLD_START = 0.5
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
-RATIO_MALICIOUS = 0.3
+RATIO_MALICIOUS = 1.0
+RATIO_DEFECTIVE = 0.05
+DEFECTIVE = False
+
+# This should be one of uniform or bursty
+ARRIVAL_RATE = 'uniform'
 
 # Number of sources chosen for a single request
 S_req = 10
@@ -44,13 +49,14 @@ REPUTATION_MIN = -0.40
 
 # Ground truth of the temperature value (we assume always the same)
 GROUND_TRUTH = 25
+FALSE_TRUTH = 10 #10
 # What is the maximum error for a measurement that generates a score of 0 (a higher error value corresponds to a negative score)
 TOLERANCE = 3.0 # Accuracy
 
 # Max variance for trusted and untrusted sources for generating their value
 # Nullify probability is the probability to yield a null value (defective) for malicious
-MAX_VARIANCE = 4.0
-MAX_VARIANCE_UNTRUSTED = 12.0
+MAX_VARIANCE = 4.0 # FIXME 4
+MAX_VARIANCE_UNTRUSTED = 4.0 # FIXME 12
 NULLIFY_PROB = 0.05
 
 # Number of samples generated for each Source
@@ -70,10 +76,11 @@ Ranking = []
 # Banned Master Array
 Banlist = []
 
-def printRanking(_ranking, verbose=False, header=""):
+def printRanking(_ranking, verbose=False, header="", candidates=[]):
     print(header + "\n")
-    for r in _ranking:
-        r.print_self(verbose=verbose)
+    for idx, r in enumerate(_ranking):
+        if idx in candidates or len(candidates) == 0:
+            r.print_self(verbose=verbose)
 
 # NaN and None are interchangeable for numpy
 def isNull(_n):
@@ -88,16 +95,16 @@ def calculateScore(error):
 # Value matrix are the actual values given by the candidates
 def runConsensus(value_matrix, algo=ALGO_REP):
 
-    if (algo == ALGO_AVG):
-        result = np.nanmean(value_matrix)
-        return result if result else 0
-        
-
-    if (algo == ALGO_MED):
+    if (algo == ALGO_MED or True):
         result = np.nanmedian(value_matrix)
         return result if result else 0
 
+    if (algo == ALGO_AVG):
+        result = np.nanmean(value_matrix)
+        return result if result else 0
+
     # PROPOSED ALGORITHM BEGIN
+    # FUCK THIS ALGORITHM
 
     # The matrix of values aligned on time
     sync_matrix = value_matrix # FIXME time processing is missing
@@ -125,10 +132,11 @@ class Source:
 
         self.reputation = REPUTATION_INIT
         self.trusted = trusted
+        self.defective = DEFECTIVE and np.random.rand() < RATIO_DEFECTIVE
         if trusted:
-            self.variance = np.random.rand() * MAX_VARIANCE
+            self.variance = MAX_VARIANCE # * np.random.rand()
         else:
-            self.variance = np.random.rand() * MAX_VARIANCE_UNTRUSTED
+            self.variance = MAX_VARIANCE_UNTRUSTED # * np.random.rand()
         self.last_score = None
         self.lastGeneratedSample = None
         return
@@ -136,9 +144,14 @@ class Source:
     # Generate a number of data samples around the ground truth
     # FIXME TIME is not taken into account here
     def generateSample(self):
-        self.lastGeneratedSample = np.random.normal(loc=GROUND_TRUTH, scale=self.variance, size=N_SAMPLES)
+        if self.trusted:
+            self.lastGeneratedSample = np.random.normal(loc=GROUND_TRUTH, scale=self.variance, size=N_SAMPLES)
+        else:
+            self.lastGeneratedSample = np.random.normal(loc=FALSE_TRUTH, scale=self.variance, size=N_SAMPLES)
+            # self.lastGeneratedSample = np.random.uniform(low=(GROUND_TRUTH - self.variance / 2), high=(GROUND_TRUTH + self.variance / 2), size=N_SAMPLES)
+
         # Nullify if unstrusted
-        if not self.trusted:
+        if self.defective: # FIXME
             for _idx, _x in enumerate(self.lastGeneratedSample):
                 if np.random.rand() < NULLIFY_PROB:
                     self.lastGeneratedSample[_idx] = None
@@ -191,12 +204,13 @@ if __name__ == "__main__":
     counter_malign = 0
     counter_banned_sources = 0
     counter_banned_malign = 0
+    counter_fail = 0
     
     # try:
     print("Algorithm: " + ALGO_LIST[ALGO])
 
     # EPOCH START
-    with open(FILE_OUT, 'a') as outfile:
+    with open(FILE_OUT, 'w') as outfile:
 
         for epoch in tqdm(range(N_EPOCHS)):
 
@@ -221,9 +235,6 @@ if __name__ == "__main__":
             else:
                 # This happens if I kicked out so many sources that I need to take them all
                 candidates_indices = indices
-            # What if empty ranking?
-            if len(indices) <= 0:
-                continue
 
             # Generate sample for each of the Candidates
             # assert len(candidates_indices) == S_req
@@ -243,6 +254,10 @@ if __name__ == "__main__":
                 consensus = 0
             if _DEBUG_:
                 print("\tCONSENSUS: " + str(consensus))
+            if abs(consensus - GROUND_TRUTH) > TOLERANCE:
+                counter_fail += 1
+                if _DEBUG_:
+                    printRanking(Ranking, candidates=candidates_indices, verbose=True)
 
             # Generate a score for each candidate and update the reputation
             for _i in candidates_indices:
@@ -296,6 +311,7 @@ if __name__ == "__main__":
 
     print("Precision: {}".format( (counter_banned_malign / counter_banned_sources) if counter_banned_sources else 0 ))
     print("Recall {}".format( (counter_banned_malign / counter_malign) if counter_malign else 0 ))
+    print("Failures {}".format(counter_fail))
 
     # except Exception as e:
     #     print (e)

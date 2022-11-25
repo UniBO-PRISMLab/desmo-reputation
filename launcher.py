@@ -3,19 +3,19 @@ from subprocess import Popen, PIPE
 
 # REPUTATION_MIN
 REPUTATION_MIN_arr = [-0.8, -0.6, -0.4, -0.2]
-#REPUTATION_MIN_arr = [-0.6, -0.4]
+REPUTATION_MIN_arr = [-0.6, -0.4]
 
 # RATIO_MALICIOUS
 RATIO_MALICIOUS_arr = [0.25, 0.5, 0.75, 1.0]
-#RATIO_MALICIOUS_arr = [0.25, 0.75]
+RATIO_MALICIOUS_arr = [0.5, 1.0]
 
 # ALPHA
 ALPHA_arr = [0.1, 0.3, 0.5, 0.7]
-#ALPHA_arr = [0.5]
+ALPHA_arr = [0.5]
 
 # TOLERANCE
 TOLERANCE_arr = [3.0, 1.0, 5.0]
-#TOLERANCE_arr = [3.0]
+TOLERANCE_arr = [3.0]
 
 # ALGORITHM
 ALGO = [0, 1, 2]
@@ -25,9 +25,9 @@ FILE_OUT_path = "results"
 FILE_OUT_prefix = "REP"
 
 REPETITIONS = 10
-#REPETITIONS = 1
+REPETITIONS = 1
 
-OVERWRITE = False
+OVERWRITE = True
 
 if not os.path.exists(FILE_OUT_path):
     os.makedirs(FILE_OUT_path)
