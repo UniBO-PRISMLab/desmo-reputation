@@ -91,7 +91,7 @@ img_name = "num_mal_over_time.png"
 if not _DISCARD_:
     if _REPLACE_ or not os.path.exists(img_name):
         sns.lineplot(data=df_def, x='Epoch', y='Recall', hue='ratio_malign')
-        plt.legend(title='Ratio of Malicious Sources', loc='upper left')
+        plt.legend(title='Ratio of Malicious Sources', loc='lower right')
         plt.savefig(img_name, dpi=300)
         print (img_name + "Done")
 
@@ -101,9 +101,10 @@ if not _DISCARD_:
 # The "min reputation" is the discriminant here
 img_name = "min_rep_rec_over_time.png"
 if _REPLACE_ or not os.path.exists(img_name):
+    fig, ax  = plt.subplots()
     print ("Doing " + img_name)
     sns.lineplot(data=df_def, x='Epoch', y='Recall', hue='rep_min')
-    plt.legend(title='Min Reputation', loc='upper left')
+    plt.legend(title='Min Reputation', loc='lower right')
     plt.savefig(img_name, dpi=300)
     # plt.show()
     print (img_name + "Done")
@@ -114,8 +115,10 @@ if _REPLACE_ or not os.path.exists(img_name):
 # The "min reputation" is the discriminant here
 img_name = "min_rep_prec_over_time.png"
 if _REPLACE_ or not os.path.exists(img_name):
+    fig, ax  = plt.subplots()
+    print ("Doing " + img_name)
     sns.lineplot(data=df_def, x='Epoch', y='Precision', hue='rep_min')
-    plt.legend(title='Min Reputation', loc='upper left')
+    plt.legend(title='Min Reputation', loc='lower right')
     plt.savefig(img_name, dpi=300)
     # plt.show()
     print (img_name + "Done")
