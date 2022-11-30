@@ -5,6 +5,9 @@ import glob
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
+import numpy as np
+import matplotlib.ticker as mtick
+
 
 # %%
 # Constants
@@ -14,7 +17,29 @@ HEADERS = ["Epoch", "sources", "malign", "ban_sources", "ban_malign", "consensus
 print("Found {} results".format(len(all_files)))
 
 _DISCARD_ = True
-_REPLACE_ = False
+_REPLACE_ = True
+
+# %%
+rc_params = {
+    'font.size': 26,
+    'legend.fontsize': 12,
+    'legend.title_fontsize': 14,
+    'figure.figsize': (7, 5),
+    'axes.facecolor': '#FFFFFF',
+    'figure.dpi': 300.0,
+    'xtick.labelsize': 14.0,
+    'ytick.labelsize': 14.0,
+    'axes.labelsize': 16.0,
+    'figure.titlesize': 20
+    }
+
+sns.set_theme(style='ticks', rc=rc_params)
+
+sns.set_palette(sns.cubehelix_palette(n_colors=3, light=0.8, start=2))
+
+# https://colorbrewer2.org/#type=diverging&scheme=PuOr&n=4
+
+# plt.rcParams.keys()
 
 # %%
 print("Import results...")
@@ -28,8 +53,9 @@ for filename in tqdm(all_files):
     _df['tolerance'] = float(_params[4])
     _df['repetition'] = float(_params[5])
     _df['Algorithm'] = float(_params[6])
+    _df['Arrival'] = _params[7]
     # Local Processing
-    if float(_params[4]) == 3.0: # and float(_params[5]) <=3 and float(_params[3]) == 0.5:
+    if float(_params[4]) == 3.0 and float(_params[5]) == 2 and float(_params[3]) == 0.5:
         _li.append(_df)
 df = pd.concat(_li, axis=0, ignore_index=True)
 print("We ended up with {} rows".format(len(df)))
@@ -48,14 +74,14 @@ print("Precision done")
 GROUND_TRUTH = 25
 df['Consensus Accuracy'] = df.apply(lambda row: (1 if abs(row['consensus'] - GROUND_TRUTH) < row['tolerance'] else 0), axis=1)
 print("Consensus Accuracy done")
+df_def = df.drop(df[df.Algorithm != 2].index)
+#df_good = df.drop(df[df['Consensus Accuracy'] == 0].index)
 
-df_def = df
 
 # %%
 # Reduce dataset for tests XXX
 # df_def = df.drop(df[df.repetition > 0].index)
 # df_def = df_def.drop(df_def[df_def.alpha == 0.3].index)
-# df_def
 
 # %%
 # PLOT 1 [ DISCARD PLOT ] - RECALL OVER TIME
@@ -73,7 +99,7 @@ if not _DISCARD_:
 # PLOT 1 - RECALL OVER TIME
 # How many malicious sources I manage to kick out over time.
 # The "min reputation" is the discriminant here
-img_name = "min_rep_over_time.png"
+img_name = "min_rep_rec_over_time.png"
 if _REPLACE_ or not os.path.exists(img_name):
     print ("Doing " + img_name)
     sns.lineplot(data=df_def, x='Epoch', y='Recall', hue='rep_min')
@@ -83,17 +109,16 @@ if _REPLACE_ or not os.path.exists(img_name):
     print (img_name + "Done")
 
 # %%
-# PLOT 1 [DISCARD PLOT] - PRECISION OVER TIME
+# PLOT 1 - PRECISION OVER TIME
 # How many malicious sources I manage to kick out over time.
 # The "min reputation" is the discriminant here
 img_name = "min_rep_prec_over_time.png"
-if not _DISCARD_:
-    if _REPLACE_ or not os.path.exists(img_name):
-        sns.lineplot(data=df_def, x='Epoch', y='Precision', hue='rep_min')
-        plt.legend(title='Min Reputation', loc='upper left')
-        plt.savefig(img_name, dpi=300)
-        # plt.show()
-        print (img_name + "Done")
+if _REPLACE_ or not os.path.exists(img_name):
+    sns.lineplot(data=df_def, x='Epoch', y='Precision', hue='rep_min')
+    plt.legend(title='Min Reputation', loc='upper left')
+    plt.savefig(img_name, dpi=300)
+    # plt.show()
+    print (img_name + "Done")
 
 # %%
 # PLOT 2 [DISCARD PLOT] - IMPACT ON CONSENSUS
@@ -126,23 +151,90 @@ if not _DISCARD_:
 # Average - no kick out
 # Median - with ranking - no kick out
 
-img_name = "algorithm_comparison.png"
-if _REPLACE_ or not os.path.exists(img_name):
+img_name = "algorithm_comparison_bursty.png"
+if (_REPLACE_ or not os.path.exists(img_name)) and not _DISCARD_:
     print("Doing " + img_name)
-    df_good = df_def = df.drop(df[df['Consensus Accuracy'] == 0].index)
-
     ax = sns.countplot(data=df_good, x='ratio_malign', hue='Algorithm')
-    for p in ax.patches:
-        print( p.get_height() )
-    plt.legend(title='Algorithm', loc='upper left')
+    for i in ax.containers:
+        ax.bar_label(i, fontsize=5)
+    plt.legend(title='Algorithm', loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=3,
+    labels=['Consensus', 'Ranking', 'Reputation'])
     ax.set_xlabel('Ratio of Malignous Sources', fontsize=16)
-    ax.set_ylabel('Count of Accurate Responses', fontsize=16)
+    ax.set_ylabel('Ratio of Accurate Responses', fontsize=16)
 
     plt.tight_layout()
     # plt.show()
     plt.savefig(img_name, dpi=200)
     print(img_name + " Done!")
 
+
+# %%
+print("Doing the bars...")
+df_bar = df.groupby(['rep_min', 'ratio_malign', 'Algorithm', 'Arrival'])['Consensus Accuracy'].agg(['sum','count']).reset_index()
+df_bar['Accuracy'] = df_bar.apply(lambda x: float(x['sum']) / float(x['count']) , axis=1)
+df_bar['ratio_malign'] = df_bar.apply(lambda x: float(x['ratio_malign'] / 2 * 100.0), axis=1)
+
+
+df_bar = df_bar.groupby(['ratio_malign', 'Algorithm', 'Arrival'])['Accuracy'].agg(['mean','std']).reset_index()
+
+
+# %%
+# ax = sns.barplot(data=df_bar[df_bar['Arrival'] == 'bursty'], x="ratio_malign", y="Accuracy", hue="Algorithm")
+# bx = sns.barplot(data=df_bar[df_bar['Arrival'] == 'uniform'], x="ratio_malign", y="Accuracy", hue="Algorithm")
+
+
+
+# for i in ax.containers:
+#     ax.bar_label(i, fmt='%.2f', rotation=90, fontsize=8)
+
+
+# plt.legend(title='Algorithm', loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=3,
+# labels=['Median', 'Median-R', 'Median-RB'])
+# ax.set_xlabel('Percentage of Malicious Sources', fontsize=16)
+# ax.set_ylabel('Accuracy', fontsize=16)
+# ax.set_xticklabels([str(x).split("\'")[1]+'%' for x in ax.get_xticklabels()])
+# plt.ylim([0,1.1])
+
+# %%
+img_name = "desmo_accuracy.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    print ("Doing " + img_name)
+    xvals = df_bar['ratio_malign'].unique()
+    algos = df_bar['Algorithm'].unique()
+    arrs = np.flip(df_bar['Arrival'].unique())
+
+    width = 2
+
+    colors = sns.cubehelix_palette(n_colors=3, light=0.8, start=2) # ['r', 'g', 'b']
+    hatches = ['','//']
+
+    fig, ax  = plt.subplots()
+
+    plt.xticks(xvals)
+    xvals = xvals - (len(algos) * len(arrs) * width / 2) - (width/2)
+    plt.xlabel('Percentage of Malicious Sources', fontsize=16)
+    plt.ylabel('Accuracy', fontsize=16)
+    plt.rcParams['mathtext.default'] = 'regular'
+    for i, algo in enumerate(algos):
+        for j, arr in enumerate(arrs):
+            xvals = xvals + width
+            xlist = xvals.tolist()
+            yvals = df_bar[df_bar['Arrival'] == arr][df_bar['Algorithm'] == algo]['mean'].tolist()
+            yerrs = df_bar[df_bar['Arrival'] == arr][df_bar['Algorithm'] == algo]['std'].tolist()
+            plt.bar(xvals, yvals, color = colors[i], width = width, label = str(algo)+str(arr), hatch=hatches[j], yerr=yerrs)
+            for h in range(len((yvals))):
+                ax.text(xlist[h] - width/2 + 0.05, yvals[h] + 0.01, str('{0:.2f}'.format(yvals[h])), rotation=90, fontsize=6, color='black', fontweight='bold')
+            # for pos, y, err in zip(xvals, yvals, yerrs):
+            #     ax.errorbar(pos, y, err, lw = 2,
+            #                 capsize = 4, capthick = 2,
+            #                 color = "red")
+    plt.legend(loc='upper center', bbox_to_anchor=(0.48, 1.25), ncol=3, labels=['Med (uniform)', 'Med (bursty)', 'Med-R (uniform)', 'Med-R (bursty)', 'Med-RB (uniform)', 'Med-RB (bursty)'])
+    plt.ylim([0,1.1])
+    plt.gca().xaxis.set_major_formatter(mtick.PercentFormatter(decimals=1))
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(img_name, dpi=200)
+    print(img_name + " Done!")
 
 # %%
 # df_use = df_def
