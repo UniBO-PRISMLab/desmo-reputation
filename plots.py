@@ -55,7 +55,7 @@ for filename in tqdm(all_files):
     _df['Algorithm'] = float(_params[6])
     _df['Arrival'] = _params[7]
     # Local Processing
-    if float(_params[4]) == 3.0 and float(_params[5]) == 2 and float(_params[3]) == 0.5:
+    if float(_params[4]) == 3.0 and float(_params[3]) == 0.5:
         _li.append(_df)
 df = pd.concat(_li, axis=0, ignore_index=True)
 print("We ended up with {} rows".format(len(df)))

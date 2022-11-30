@@ -11,11 +11,11 @@ RATIO_MALICIOUS_arr = [0.25, 0.5, 0.75, 1.0]
 
 # ALPHA
 ALPHA_arr = [0.1, 0.3, 0.5, 0.7]
-# ALPHA_arr = [0.5]
+ALPHA_arr = [0.5]
 
 # TOLERANCE
 TOLERANCE_arr = [3.0, 1.0, 5.0]
-# TOLERANCE_arr = [3.0]
+TOLERANCE_arr = [3.0]
 
 # ALGORITHM
 ALGO = [0, 1, 2]
@@ -26,8 +26,8 @@ ARRIVAL_RATE_arr = ['uniform', 'bursty']
 FILE_OUT_path = "results"
 FILE_OUT_prefix = "REP"
 
-REPETITIONS = 10
-REPETITIONS = 1
+REPETITIONS = 20
+#REPETITIONS = 1
 
 OVERWRITE = True
 
