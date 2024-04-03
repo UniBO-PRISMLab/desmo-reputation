@@ -33,12 +33,12 @@ if _TESTING_:
     I = 10
 
 # Total number of sources
-S = 10000 
+S = 1000 
 if _TESTING_:
     S = 1000
 
 # Number of Epochs (the ratio for arrivals is the ratio of epochs in which we add up sources)
-N_EPOCHS = 10000
+N_EPOCHS = 2000
 if _TESTING_:
     N_EPOCHS = 40
 RATIO_EPOCHS_ARRIVALS = 0.5
@@ -46,18 +46,20 @@ RATIO_EPOCHS_ARRIVALS = 0.5
 # Ratio of sources present at cold start (between 0 and 1)
 RATIO_COLD_START = 0.5
 
-# Ratio of malicious sources within the remaining ones (between 0 and 1)
-RATIO_MALICIOUS_SOURCES = 0.6
-
 # Ratio of malicious Indexers (if there is any, then malicious sources will only go into malicious indexers and good sources into good indexers)
-RATIO_MALICIOUS_INDEXERS = RATIO_MALICIOUS_SOURCES / 2
+RATIO_MALICIOUS_INDEXERS = 0.5
 VERTICAL_ATTACK = True #Vertical attack forces all malicious sources to go into malicious indexers, otherwise they distribute evenly
+
+# Ratio of malicious sources within the remaining ones (between 0 and 1)
+RATIO_MALICIOUS_SOURCES = RATIO_MALICIOUS_INDEXERS * 2
+
+
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
 RATIO_MALICIOUS_ORACLES = 0.0
 
 # This should be one of 'uniform' or 'bursty'
-ARRIVAL_RATE = 'uniform'
+ARRIVAL_RATE = 'bursty'
 
 # Number of oracles chosen for a single request
 O_req = 5
@@ -171,7 +173,7 @@ if __name__ == "__main__":
         # REPUTATION_MIN
         REPUTATION_MIN = float(sys.argv[1])
         # RATIO_MALICIOUS
-        RATIO_MALICIOUS_SOURCES = float(sys.argv[2])
+        RATIO_MALICIOUS_INDEXERS = float(sys.argv[2])
         
         # ALPHA
         Indexer.ALPHA = float(sys.argv[3])
