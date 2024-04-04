@@ -36,7 +36,7 @@ FILE_OUT_prefix = "REP"
 REPETITIONS = 10
 REP_START = 0
 
-OVERWRITE = False
+OVERWRITE = True
 
 if not os.path.exists(FILE_OUT_path):
     os.makedirs(FILE_OUT_path)

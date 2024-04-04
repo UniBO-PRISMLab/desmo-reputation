@@ -413,8 +413,6 @@ if __name__ == "__main__":
                     str(avg_reputation_malign)                      # AVERAGE REPUTATION OF MALIGN SOURCES
                 ]) + "\n"
             )
-
-            print (epoch, avg_reputation_benign, avg_reputation_malign)
             
     # EPOCH END
     
