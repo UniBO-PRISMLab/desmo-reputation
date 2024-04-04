@@ -11,8 +11,8 @@ from operator import itemgetter
 from Source import Producers
 from Indexer import Indexers
 
-_TESTING_ = True
-_DEBUG_ = True
+_TESTING_ = False
+_DEBUG_ = False
 
 # ALGORITHMS
 ALGO_AVG = 0         # Computes only the average
@@ -192,11 +192,11 @@ if __name__ == "__main__":
         # Ratio Malicious Oracles
         RATIO_MALICIOUS_ORACLES = float(sys.argv[9])
 
-    # Check if we are compromised (i.e. Malicious Oracles and Indexers are taking up MORE than 50% of the value matrix)
-    malicious_power = RATIO_MALICIOUS_INDEXERS + RATIO_MALICIOUS_ORACLES - RATIO_MALICIOUS_ORACLES * RATIO_MALICIOUS_INDEXERS
-    if malicious_power > 0.5:
-        # Skip the simulation, there's no point
-        sys.exit()
+    # Check if we are compromised (i.e. Malicious Oracles and Indexers are taking up MORE than 50% of the value matrix) FIXME we still try
+    # malicious_power = RATIO_MALICIOUS_INDEXERS + RATIO_MALICIOUS_ORACLES - RATIO_MALICIOUS_ORACLES * RATIO_MALICIOUS_INDEXERS
+    # if malicious_power > 0.5:
+    #     # Skip the simulation, there's no point
+    #     sys.exit()
 
     # Number of sources present at cold start and its dual 
     S_0 = int(S * RATIO_COLD_START)
@@ -226,9 +226,6 @@ if __name__ == "__main__":
         #     arrivals[_burst + _idx_mal] = arrivals[_burst]
     else:
         sys.exit(0)
-
-    print (arrivals, arrivals_malicious)
-    sys.exit()
 
     # Fill up the dict of Oracles
     idx_malicious_oracles = np.random.choice(np.arange(O), int(RATIO_MALICIOUS_ORACLES * O), replace=False)
