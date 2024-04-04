@@ -11,8 +11,8 @@ from operator import itemgetter
 from Source import Producers
 from Indexer import Indexers
 
-_TESTING_ = False
-_DEBUG_ = False
+_TESTING_ = True
+_DEBUG_ = True
 
 # ALGORITHMS
 ALGO_AVG = 0         # Computes only the average
@@ -38,16 +38,16 @@ if _TESTING_:
     S = 1000
 
 # Number of Epochs (the ratio for arrivals is the ratio of epochs in which we add up sources)
-N_EPOCHS = 2000
+N_EPOCHS = 3000
 if _TESTING_:
-    N_EPOCHS = 40
+    N_EPOCHS = 60
 RATIO_EPOCHS_ARRIVALS = 0.5
 
 # Ratio of sources present at cold start (between 0 and 1)
 RATIO_COLD_START = 0.5
 
 # Ratio of malicious Indexers (if there is any, then malicious sources will only go into malicious indexers and good sources into good indexers)
-RATIO_MALICIOUS_INDEXERS = 0.5
+RATIO_MALICIOUS_INDEXERS = 0.3
 VERTICAL_ATTACK = True #Vertical attack forces all malicious sources to go into malicious indexers, otherwise they distribute evenly
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
@@ -203,7 +203,8 @@ if __name__ == "__main__":
     S_remainder = S - S_0
 
     # Array of arrival and of malicious
-    arrivals = np.random.randint(0, high=N_EPOCHS*RATIO_EPOCHS_ARRIVALS, size=S_remainder)
+    # arrivals = np.random.randint(0, high=N_EPOCHS*RATIO_EPOCHS_ARRIVALS, size=S_remainder) OLD ARRIVALS
+    arrivals = np.random.randint(int(N_EPOCHS / 3.0), high=int(N_EPOCHS / 3.0 * 2.0), size=S_remainder) # FIXME magic numbers
     arrivals.sort()
     arrivals_malicious = np.zeros(S_remainder)
     # Put ones where malicious are
@@ -213,12 +214,21 @@ if __name__ == "__main__":
             arrivals_malicious[_idx] = 1.0
     elif ARRIVAL_RATE == 'bursty':
         # pick one epoch where the burst takes place and force the next malicious one to happen all at once
-        _burst = np.random.randint(S_remainder - int(RATIO_MALICIOUS_SOURCES * S_remainder) + 1)
-        for _idx_mal in range(int(RATIO_MALICIOUS_SOURCES * S_remainder)):
-            arrivals_malicious[_burst + _idx_mal] = 1.0
-            arrivals[_burst + _idx_mal] = arrivals[_burst]
+        # _burst = np.random.randint(S_remainder - int(RATIO_MALICIOUS_SOURCES * S_remainder) + 1) # XXX OLD BURST happening at the beginning
+        _burst = np.random.randint(int(N_EPOCHS / 3.0)) + int(N_EPOCHS / 3.0)
+        for _idx in np.random.choice(np.arange(S_remainder), int(RATIO_MALICIOUS_SOURCES * S_remainder), replace=False):
+            arrivals[_idx] = _burst
+        arrivals.sort()
+        arrivals_malicious = [ 1.0 if x == _burst else 0.0 for x in arrivals ]
+
+        # for _idx_mal in range(int(RATIO_MALICIOUS_SOURCES * S_remainder)):
+        #     arrivals_malicious[_burst + _idx_mal] = 1.0
+        #     arrivals[_burst + _idx_mal] = arrivals[_burst]
     else:
         sys.exit(0)
+
+    print (arrivals, arrivals_malicious)
+    sys.exit()
 
     # Fill up the dict of Oracles
     idx_malicious_oracles = np.random.choice(np.arange(O), int(RATIO_MALICIOUS_ORACLES * O), replace=False)
@@ -406,6 +416,8 @@ if __name__ == "__main__":
                     str(avg_reputation_malign)                      # AVERAGE REPUTATION OF MALIGN SOURCES
                 ]) + "\n"
             )
+
+            print (epoch, avg_reputation_benign, avg_reputation_malign)
             
     # EPOCH END
     

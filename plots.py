@@ -258,7 +258,7 @@ if (_REPLACE_ or not os.path.exists(img_name)) and not _DISCARD_:
 print("Doing the bars...")
 df_bar = df.groupby(['rep_min', 'ratio_malign', 'Algorithm', 'Arrival'])['Consensus Accuracy'].agg(['sum','count']).reset_index()
 df_bar['Accuracy'] = df_bar.apply(lambda x: float(x['sum']) / float(x['count']) , axis=1)
-df_bar['ratio_malign'] = df_bar.apply(lambda x: float(x['ratio_malign'] / 2 * 100.0), axis=1)
+df_bar['ratio_malign'] = df_bar.apply(lambda x: float(x['ratio_malign'] * 100.0), axis=1)
 df_bar = df_bar.groupby(['ratio_malign', 'Algorithm', 'Arrival'])['Accuracy'].agg(['mean','std']).reset_index()
 
 
