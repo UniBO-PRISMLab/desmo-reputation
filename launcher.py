@@ -44,7 +44,7 @@ if not os.path.exists(FILE_OUT_path):
 # 1920 outfiles old
 
 counter = 0
-total = REPETITIONS * len(REPUTATION_MIN_arr) * len(RATIO_MALICIOUS_arr)* len(ALPHA_arr)* len(TOLERANCE_arr)* len(ALGO)*len(ARRIVAL_RATE_arr)*len(BETA_arr)
+total = REPETITIONS * len(REPUTATION_MIN_arr) * len(RATIO_MALICIOUS_arr)* len(ALPHA_arr)* len(TOLERANCE_arr)* len(ALGO)*len(ARRIVAL_RATE_arr)*len(BETA_arr)*len(RATIO_MALICIOUS_ORACLES_arr)
 
 for mal_orac in RATIO_MALICIOUS_ORACLES_arr:
     for rep in range(REP_START, REPETITIONS):
