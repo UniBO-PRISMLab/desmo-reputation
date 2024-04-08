@@ -11,7 +11,7 @@ from operator import itemgetter
 from Source import Producers
 from Indexer import Indexers
 
-_TESTING_ = False
+_TESTING_ = True
 _DEBUG_ = False
 
 # ALGORITHMS
@@ -56,7 +56,7 @@ RATIO_MALICIOUS_SOURCES = RATIO_MALICIOUS_INDEXERS * 2
 
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
-RATIO_MALICIOUS_ORACLES = 0.0
+RATIO_MALICIOUS_ORACLES = 0.3
 
 # This should be one of 'uniform' or 'bursty'
 ARRIVAL_RATE = 'bursty'
@@ -103,6 +103,8 @@ def createNewProducer(trusted = True):
     # Long Tail pareto distribution
     #_n_indexers = np.random.randint(1, len(interesting_indexers)) # Register to random number of Indexers
     _n_indexers = min(round(random.paretovariate(alpha=2)), len(interesting_indexers))
+    if not _n_indexers > 0:
+        print(len(Indexers), " DAMMIT")
     assert(_n_indexers > 0)
 
     for _indexer in np.random.choice(interesting_indexers, _n_indexers, replace=False): # And pick them randomly
@@ -346,7 +348,9 @@ if __name__ == "__main__":
             delay_matrix = np.zeros_like(value_matrix) # first index is the source (row), second index is the oracle (column)
             for row, _prod in enumerate(delay_matrix):
                 for col, _oracle in enumerate(_prod):
-                    delay_matrix[row][col] = Producers[sources_trusted_idx[row]].generateDelay() + Oracles[selected_oracles[col]].generateDelay()
+                    del_o = Oracles[selected_oracles[col]].generateDelay()
+                    del_p = Producers[sources_trusted_idx[row]].generateDelay() if len(sources_trusted_idx) > 0 else 100.0 # A very high number because it means that there are no producers
+                    delay_matrix[row][col] = del_o + del_p
             delay_array = np.sum(delay_matrix, axis=0)
             winner = delay_array.min()
             delay_array -= winner
@@ -365,12 +369,13 @@ if __name__ == "__main__":
 
                 oracle_consistency_array = [Producers[_source].last_consistency_array[_o_id_request] for _source in sources_idx]
 
-                Oracles[_o].updateReputation(
-                    # Taking here the scores of all values queried by the oracle (i.e. in position _o_id_request in their score array)
-                    oracle_consistency_array,
-                    delay_array[_o_id_request],
-                    time_threshold
-                )
+                if len(sources_idx) > 0:
+                    Oracles[_o].updateReputation(
+                        # Taking here the scores of all values queried by the oracle (i.e. in position _o_id_request in their score array)
+                        oracle_consistency_array,
+                        delay_array[_o_id_request],
+                        time_threshold
+                    )
                 #print(_o, delay_array[_o_id_request], np.mean(oracle_consistency_array))
 
             #================================#

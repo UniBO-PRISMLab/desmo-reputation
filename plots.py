@@ -70,15 +70,15 @@ df = pd.concat(_li, axis=0, ignore_index=True)
 print("We ended up with {} rows".format(len(df)))
 
 # %%
+
+
+# %%
 # Calculate Precision and Recall
 print("Calculate precision and recall")
 df['Recall'] = df.apply(lambda row: (row['ban_malign'] / row['malign'] if row['malign'] else 0), axis=1)
 print("Recall done")
 df['Precision'] = df.apply(lambda row: (row['ban_malign'] / row['ban_sources'] if row['ban_sources'] else 0), axis=1)
 print("Precision done")
-
-
-# %%
 # Calculate Consensus Accuracy
 GROUND_TRUTH = 25
 df['Consensus Accuracy'] = df.apply(lambda row: (1 if abs(row['consensus'] - GROUND_TRUTH) < row['tolerance'] else 0), axis=1)
@@ -89,15 +89,18 @@ print("Consensus Accuracy done")
 
 # %%
 # Reduce dataset for tests XXX
-df_def = df.drop(df[(df.Algorithm != 2)].index) # This is only considering our algorithm
-df_endtime = df_def.drop(df_def[(df_def.Epoch < 39)].index) # This is only conisdering the very last stage of the simulation,rather than evry single epoch
+df_goodo = df.drop(df[(df['Ratio Malicious Oracles'] != 0.0)].index)
+df_def = df_goodo.drop(df_goodo[(df_goodo.Algorithm != 2)].index) # This is only considering our algorithm
+#df_endtime = df_def.drop(df_def[(df_def.Epoch < 39)].index) # This is only conisdering the very last stage of the simulation,rather than evry single epoch
 
 #df_endtime
 
 
 # %%
 # df_def = df_def.drop(df_def[df_def.alpha == 0.3].index)
+
 #df_def
+#df_def['rep_min'].unique()
 
 # %%
 # PLOT 1 [ DISCARD PLOT ] - RECALL OVER TIME
@@ -106,7 +109,6 @@ df_endtime = df_def.drop(df_def[(df_def.Epoch < 39)].index) # This is only conis
 img_name = "num_mal_over_time.png"
 if not _DISCARD_:
     if _REPLACE_ or not os.path.exists(img_name):
-        plt.figure()
         sns.lineplot(data=df_def, x='Epoch', y='Recall', hue='ratio_malign')
         plt.legend(title='Ratio of Malicious Sources', loc='upper left')
         plt.savefig(img_name, dpi=300)
@@ -119,7 +121,7 @@ if not _DISCARD_:
 img_name = "min_rep_rec_over_time.png"
 if _REPLACE_ or not os.path.exists(img_name):
     print ("Doing " + img_name)
-    plt.figure()
+    fig, ax  = plt.subplots()
     sns.lineplot(data=df_def, x='Epoch', y='Recall', hue='rep_min', palette=zonia_palette)
     plt.legend(title='Min Reputation', loc='lower right')
     plt.savefig(img_name, dpi=300)
@@ -132,8 +134,7 @@ if _REPLACE_ or not os.path.exists(img_name):
 # The "min reputation" is the discriminant here
 img_name = "min_rep_prec_over_time.png"
 if _REPLACE_ or not os.path.exists(img_name):
-    print ("Doing " + img_name)
-    plt.figure()
+    fig, ax  = plt.subplots()
     sns.lineplot(data=df_def, x='Epoch', y='Precision', hue='rep_min', palette=zonia_palette)
     plt.legend(title='Min Reputation', loc='lower right')
     plt.savefig(img_name, dpi=300)
@@ -141,13 +142,31 @@ if _REPLACE_ or not os.path.exists(img_name):
     print (img_name + "Done")
 
 # %%
+# Dataset only with threshold = -0.4
+df_def_4 = df_def.drop(df_def[(df_def.rep_min != -0.4)].index)
+
+# %%
 # PLOT 2 - RECALL OVER NUM MALICIOUS
 # How many malicious sources I manage to kick out over time.
-img_name = "min_rep_rec_over_alpha.png"
-if not _DISCARD_:
+img_name = "min_rep_rec_over_nummal.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    fig, ax  = plt.subplots()
     print ("Doing " + img_name)
-    sns.lineplot(data=df_endtime, x='ratio_malign', y='Recall', hue='rep_min', palette=zonia_palette)
-    plt.legend(title='Min Reputation', loc='upper left')
+    sns.lineplot(data=df_def_4, x='Epoch', y='Recall', hue='ratio_malign', palette=zonia_palette)
+    plt.legend(title='Ratio Malicious', loc='upper left')
+    plt.savefig(img_name, dpi=300)
+    # plt.show()
+    print (img_name + "Done")
+
+# %%
+# PLOT 2 - PRECISION OVER NUM MALICIOUS
+# How many malicious sources I manage to kick out over time.
+img_name = "min_rep_prec_over_nummal.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    fig, ax  = plt.subplots()
+    print ("Doing " + img_name)
+    sns.lineplot(data=df_def_4, x='Epoch', y='Precision', hue='ratio_malign', palette=zonia_palette)
+    plt.legend(title='Ratio Malicious', loc='upper left')
     plt.savefig(img_name, dpi=300)
     # plt.show()
     print (img_name + "Done")
@@ -156,13 +175,17 @@ if not _DISCARD_:
 # PLOT 1 - Average Reputation Benign
 # How many malicious sources I manage to kick out over time.
 # The "min reputation" is the discriminant here
-img_name = "rep_benign.png"
+img_name = "rep_ben_mal.png"
 if _REPLACE_ or not os.path.exists(img_name):
+    fig, ax  = plt.subplots()
     print ("Doing " + img_name)
-    plt.figure()
-    sns.lineplot(data=df_def, x='Epoch', y='rep_benign', hue='ratio_malign', palette=zonia_palette)
+    ab = sns.lineplot(data=df_def, x='Epoch', y='rep_benign', hue='ratio_malign', palette=zonia_palette)
+    for l in ab.lines:
+        l.set_linestyle("--")
+    aa = sns.lineplot(data=df_def, x='Epoch', y='rep_malign', hue='ratio_malign', palette=zonia_palette)
+
     plt.legend(title='Ratio of malicious indexers', loc='upper left')
-    plt.ylabel("Average reputation (benign indexers)", fontsize=16)
+    plt.ylabel("Average reputation", fontsize=16)
     plt.savefig(img_name, dpi=300)
     # plt.show()
     print (img_name + "Done")
@@ -172,9 +195,8 @@ if _REPLACE_ or not os.path.exists(img_name):
 # How many malicious sources I manage to kick out over time.
 # The "min reputation" is the discriminant here
 img_name = "rep_malign.png"
-if _REPLACE_ or not os.path.exists(img_name):
+if (_REPLACE_ or not os.path.exists(img_name)) and not _DISCARD_:
     print ("Doing " + img_name)
-    plt.figure()
     sns.lineplot(data=df_def, x='Epoch', y='rep_malign', hue='ratio_malign', palette=zonia_palette)
     plt.ylabel('Average reputation (malicious indexers)', fontsize=16)
     plt.legend(title='Ratio of malicious indexers', loc='upper left')
@@ -256,9 +278,11 @@ if (_REPLACE_ or not os.path.exists(img_name)) and not _DISCARD_:
 
 # %%
 print("Doing the bars...")
-df_bar = df.groupby(['rep_min', 'ratio_malign', 'Algorithm', 'Arrival'])['Consensus Accuracy'].agg(['sum','count']).reset_index()
+df_bar = df_goodo.groupby(['rep_min', 'ratio_malign', 'Algorithm', 'Arrival'])['Consensus Accuracy'].agg(['sum','count']).reset_index()
 df_bar['Accuracy'] = df_bar.apply(lambda x: float(x['sum']) / float(x['count']) , axis=1)
 df_bar['ratio_malign'] = df_bar.apply(lambda x: float(x['ratio_malign'] * 100.0), axis=1)
+
+
 df_bar = df_bar.groupby(['ratio_malign', 'Algorithm', 'Arrival'])['Accuracy'].agg(['mean','std']).reset_index()
 
 
@@ -266,7 +290,6 @@ df_bar = df_bar.groupby(['ratio_malign', 'Algorithm', 'Arrival'])['Accuracy'].ag
 img_name = "desmo_accuracy.png"
 if _REPLACE_ or not os.path.exists(img_name):
     print ("Doing " + img_name)
-    plt.figure()
     xvals = df_bar['ratio_malign'].unique()
     algos = df_bar['Algorithm'].unique()
     arrs = np.flip(df_bar['Arrival'].unique())
@@ -304,5 +327,126 @@ if _REPLACE_ or not os.path.exists(img_name):
     # plt.show()
     plt.savefig(img_name, dpi=200)
     print(img_name + " Done!")
+
+# %%
+img_name = "3d_accuracy_1.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    this_df = df.drop(df[(df.Algorithm != 0)].index)
+
+    xvals = sorted(this_df['Ratio Malicious Oracles'].unique())
+    yvals = sorted(this_df['ratio_malign'].unique(), reverse=True)
+    values = np.zeros(shape=(len(xvals), len(yvals)))
+    for _x, _ in enumerate(values):
+        for _y, __ in enumerate(_):
+            values[_x][_y] = this_df.loc[(this_df['Ratio Malicious Oracles'] == xvals[_x]) & (this_df['ratio_malign'] == yvals[_y]), 'Consensus Accuracy'].mean()
+    values = np.transpose(values)
+
+    # Create a 3D bar plot with Seaborn
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    xpos, ypos = np.meshgrid(np.arange(len(xvals)), np.arange(len(yvals)))
+    xpos = xpos.flatten()
+    ypos = ypos.flatten()
+    zpos = np.zeros_like(xpos)
+
+    dx = dy = 0.75
+    dz = values.flatten()
+
+    ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
+    ax.set_zlim(0, 100)
+
+    ax.set_xticks(np.arange(len(xvals)))
+    ax.set_yticks(np.arange(len(yvals)))
+    ax.set_xticklabels(xvals)
+    ax.set_yticklabels(yvals)
+
+    ax.set_xlabel('Ratio of Malicious Oracles')
+    ax.set_ylabel('Ratio of Malicious Indexers')
+    ax.set_zlabel('Accuracy')
+    plt.title('Algorithm = Med')
+    plt.savefig(img_name, dpi=200)
+
+# %%
+img_name = "3d_accuracy_2.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    this_df = df.drop(df[(df.Algorithm != 1)].index)
+
+    xvals = sorted(this_df['Ratio Malicious Oracles'].unique())
+    yvals = sorted(this_df['ratio_malign'].unique(), reverse=True)
+    values = np.zeros(shape=(len(xvals), len(yvals)))
+    for _x, _ in enumerate(values):
+        for _y, __ in enumerate(_):
+            values[_x][_y] = this_df.loc[(this_df['Ratio Malicious Oracles'] == xvals[_x]) & (this_df['ratio_malign'] == yvals[_y]), 'Consensus Accuracy'].mean()
+            print(xvals[_x], yvals[_y], values[_x][_y])
+    values = np.transpose(values)
+
+    # Create a 3D bar plot with Seaborn
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    xpos, ypos = np.meshgrid(np.arange(len(xvals)), np.arange(len(yvals)))
+    xpos = xpos.flatten()
+    ypos = ypos.flatten()
+    zpos = np.zeros_like(xpos)
+
+    dx = dy = 0.75
+    dz = values.flatten()
+
+    ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
+
+    ax.set_xticks(np.arange(len(xvals)))
+    ax.set_yticks(np.arange(len(yvals)))
+    ax.set_xticklabels(xvals)
+    ax.set_yticklabels(yvals)
+    ax.set_zlim(0, 1)
+    ax.set_xlabel('Ratio of Malicious Oracles')
+    ax.set_ylabel('Ratio of Malicious Indexers')
+    ax.set_zlabel('Accuracy')
+    plt.title('Algorithm = Med-R')
+    plt.savefig(img_name, dpi=200)
+
+# %%
+img_name = "3d_accuracy_3.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    this_df = df.drop(df[(df.Algorithm != 2)].index)
+
+    xvals = sorted(this_df['Ratio Malicious Oracles'].unique())
+    yvals = sorted(this_df['ratio_malign'].unique(), reverse=True)
+    values = np.zeros(shape=(len(xvals), len(yvals)))
+    for _x, _ in enumerate(values):
+        for _y, __ in enumerate(_):
+            values[_x][_y] = this_df.loc[(this_df['Ratio Malicious Oracles'] == xvals[_x]) & (this_df['ratio_malign'] == yvals[_y]), 'Consensus Accuracy'].mean()
+            print(xvals[_x], yvals[_y], values[_x][_y])
+    values = np.transpose(values)
+
+    # Create a 3D bar plot with Seaborn
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    xpos, ypos = np.meshgrid(np.arange(len(xvals)), np.arange(len(yvals)))
+    xpos = xpos.flatten()
+    ypos = ypos.flatten()
+    zpos = np.zeros_like(xpos)
+
+    dx = dy = 0.75
+    dz = values.flatten()
+
+    ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
+    ax.set_zlim(0, 100)
+
+    ax.set_xticks(np.arange(len(xvals)))
+    ax.set_yticks(np.arange(len(yvals)))
+    ax.set_xticklabels(xvals)
+    ax.set_yticklabels(yvals)
+
+    ax.set_xlabel('Ratio of Malicious Oracles')
+    ax.set_ylabel('Ratio of Malicious Indexers')
+    ax.set_zlabel('Accuracy')
+    plt.title('Algorithm = Med-RB')
+    plt.savefig(img_name, dpi=200)
+
+# %%
+
 
 
