@@ -328,6 +328,55 @@ if _REPLACE_ or not os.path.exists(img_name):
     plt.savefig(img_name, dpi=200)
     print(img_name + " Done!")
 
+print("Doing the bars...")
+df_bar = df_goodo2.groupby(['rep_min', 'ratio_malign', 'Algorithm', 'Arrival'])['Consensus Accuracy'].agg(['sum','count']).reset_index()
+df_bar['Accuracy'] = df_bar.apply(lambda x: float(x['sum']) / float(x['count']) , axis=1)
+df_bar['ratio_malign'] = df_bar.apply(lambda x: float(x['ratio_malign'] * 100.0), axis=1)
+
+
+df_bar = df_bar.groupby(['ratio_malign', 'Algorithm', 'Arrival'])['Accuracy'].agg(['mean','std']).reset_index()
+
+img_name = "desmo_accuracy_tail.png"
+if _REPLACE_ or not os.path.exists(img_name):
+    print ("Doing " + img_name)
+    xvals = df_bar['ratio_malign'].unique()
+    algos = df_bar['Algorithm'].unique()
+    arrs = np.flip(df_bar['Arrival'].unique())
+
+    width = 1.5
+
+    colors = sns.cubehelix_palette(n_colors=3, light=0.8, start=2) # ['r', 'g', 'b']
+    colors = ["#1B2D41", "#466C82", "#87A0B3",  "#D1E1F2"]
+    hatches = ['','//']
+
+    fig, ax  = plt.subplots()
+
+    plt.xticks(xvals)
+    xvals = xvals - (len(algos) * len(arrs) * width / 2) - (width/2)
+    plt.xlabel('Percentage of Malicious Sources', fontsize=16)
+    plt.ylabel('Accuracy', fontsize=16)
+    plt.rcParams['mathtext.default'] = 'regular'
+    for i, algo in enumerate(algos):
+        for j, arr in enumerate(arrs):
+            xvals = xvals + width
+            xlist = xvals.tolist()
+            yvals = df_bar[df_bar['Arrival'] == arr][df_bar['Algorithm'] == algo]['mean'].tolist()
+            yerrs = df_bar[df_bar['Arrival'] == arr][df_bar['Algorithm'] == algo]['std'].tolist()
+            plt.bar(xvals, yvals, color = colors[i], width = width, label = str(algo)+str(arr), hatch=hatches[j], yerr=yerrs)
+            for h in range(len((yvals))):
+                ax.text(xlist[h] - width/2 + 0.05, yvals[h] + 0.01, str('{0:.2f}'.format(yvals[h])), rotation=90, fontsize=6, color='black', fontweight='bold')
+            # for pos, y, err in zip(xvals, yvals, yerrs):
+            #     ax.errorbar(pos, y, err, lw = 2,
+            #                 capsize = 4, capthick = 2,
+            #                 color = "red")
+    plt.legend(loc='upper center', bbox_to_anchor=(0.48, 1.25), ncol=3, labels=['Med (uniform)', 'Med (bursty)', 'Med-R (uniform)', 'Med-R (bursty)', 'Med-RB (uniform)', 'Med-RB (bursty)'])
+    plt.ylim([0,1.1])
+    plt.gca().xaxis.set_major_formatter(mtick.PercentFormatter(decimals=1))
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(img_name, dpi=200)
+    print(img_name + " Done!")
+
 # %%
 img_name = "3d_accuracy_1.png"
 if _REPLACE_ or not os.path.exists(img_name):
@@ -354,7 +403,7 @@ if _REPLACE_ or not os.path.exists(img_name):
     dz = values.flatten()
 
     ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
-    ax.set_zlim(0, 100)
+    ax.set_zlim(0, 1)
 
     ax.set_xticks(np.arange(len(xvals)))
     ax.set_yticks(np.arange(len(yvals)))
@@ -433,7 +482,7 @@ if _REPLACE_ or not os.path.exists(img_name):
     dz = values.flatten()
 
     ax.bar3d(xpos, ypos, zpos, dx, dy, dz, shade=True)
-    ax.set_zlim(0, 100)
+    ax.set_zlim(0, 1)
 
     ax.set_xticks(np.arange(len(xvals)))
     ax.set_yticks(np.arange(len(yvals)))
