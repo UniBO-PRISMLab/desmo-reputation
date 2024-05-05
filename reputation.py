@@ -11,7 +11,7 @@ from operator import itemgetter
 from Source import Producers
 from Indexer import Indexers
 
-_TESTING_ = True
+_TESTING_ = False
 _DEBUG_ = False
 
 # ALGORITHMS

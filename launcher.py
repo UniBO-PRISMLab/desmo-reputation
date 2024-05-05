@@ -33,7 +33,7 @@ FILE_OUT_path = "results-test"
 FILE_OUT_prefix = "REP"
 
 #REPETITIONS = 20
-REPETITIONS = 2
+REPETITIONS = 5
 REP_START = 0
 
 OVERWRITE = True
