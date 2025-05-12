@@ -20,7 +20,13 @@ ALGO_MED = 1         # Computes the median and uses the ranking
 ALGO_REP = 2         # Our reputation algorithm
 ALGO_LIST = ["Average", "Median + Ranking", "Reputation"]
 
+# Truth inference algorithm
+TRUTH_AVG = 0
+TRUTH_MED = 1
+TRUTH_WAVG = 2
+
 ALGO = ALGO_REP
+TRUTH = TRUTH_WAVG
 
 # Total number of oracles
 O = 20
@@ -56,7 +62,7 @@ RATIO_MALICIOUS_SOURCES = RATIO_MALICIOUS_INDEXERS * 2
 
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
-RATIO_MALICIOUS_ORACLES = 0.3
+RATIO_MALICIOUS_ORACLES = 0.1
 
 # This should be one of 'uniform' or 'bursty'
 ARRIVAL_RATE = 'bursty'
@@ -134,13 +140,28 @@ def printRanking(verbose=False, header="", candidates_idx=[], banned=False):
 
 # Find a single value to elect as the Predicted truth.
 # Value matrix are the actual values given by the candidates
-def runTruthInference(value_matrix, algo=ALGO_REP):
-    result = np.nanmedian(value_matrix)
-    return result if result else 0
+def runTruthInference(value_matrix, reputation_array, algo=TRUTH_MED):
 
-    if (algo == ALGO_AVG):
+    result = None
+
+    if algo == TRUTH_AVG:
         result = np.nanmean(value_matrix)
-        return result if result else 0
+
+    elif algo == TRUTH_MED:
+        result = np.nanmedian(value_matrix)
+
+    elif algo == TRUTH_WAVG:
+
+        # get the dimensions of the value matrix
+        n_rows, n_cols = value_matrix.shape
+        # extend the reputation array to match the value matrix
+        reputation_matrix = np.transpose(np.tile([float(_r) for _r in reputation_array], (n_cols, 1)))
+        reputation_matrix += 1 # Make everything positive
+        # Normalize the reputation matrix
+        reputation_matrix /= np.sum(reputation_matrix)
+        result = np.nansum(value_matrix * reputation_matrix)
+    
+    return result if result else 0
 
     # PROPOSED ALGORITHM BEGIN
     # FUCK THIS ALGORITHM
@@ -193,6 +214,8 @@ if __name__ == "__main__":
         Source.BETA_SOURCE = float(sys.argv[8])
         # Ratio Malicious Oracles
         RATIO_MALICIOUS_ORACLES = float(sys.argv[9])
+        # Truth inference algorithm
+        TRUTH = int(sys.argv[10])
 
     # Check if we are compromised (i.e. Malicious Oracles and Indexers are taking up MORE than 50% of the value matrix) FIXME we still try
     # malicious_power = RATIO_MALICIOUS_INDEXERS + RATIO_MALICIOUS_ORACLES - RATIO_MALICIOUS_ORACLES * RATIO_MALICIOUS_INDEXERS
@@ -311,17 +334,22 @@ if __name__ == "__main__":
             # Select the Producers to query
             assert len(candidates_indices) <= S_req
             sources_idx = []
+            sources_indexers_rep = [] # Array of reputation of the indexers respective to the source above
             for _i in candidates_indices: # Add producers to the list of selectd ones without duplicates
-                sources_idx.extend(x for x in Indexers[_i].selectProducers(epoch) if x not in sources_idx) # With this I take all sources from the candidate indexer
+                _selected_producers_for_indexer = [x for x in Indexers[_i].selectProducers(epoch) if x not in sources_idx]
+                sources_idx.extend(_selected_producers_for_indexer) # With this I take all sources from the candidate indexer
+                sources_indexers_rep.extend(Indexers[_i].reputation for _ in _selected_producers_for_indexer) # For every added producer I also record the reputation of the related indexer
             
             # Generate sample for all producers that are indexed by the Candidate Indexes
             # All producers generate one sample for each querying oracle
             sources_trusted_idx = [] # This is needed to calculate the truth inference
-            for _i in sources_idx:
+            sources_trusted_indexers_rep = [] # Along with the indexers reputation
+            for _i_idx, _i in enumerate(sources_idx):
                 Producers[_i].generateSample(request = epoch, n_samples = len(selected_oracles))
                 # Pick candidates indices for which there is no null value
                 if all(not utils.isNull(_val) for _val in Producers[_i].lastGeneratedSample) or (ALGO == ALGO_AVG):
                     sources_trusted_idx.append(_i)
+                    sources_trusted_indexers_rep.append(sources_indexers_rep[_i_idx])
 
             # Make malicious Oracles tamper the values
             for _select_o, _o in enumerate(selected_oracles):
@@ -335,7 +363,7 @@ if __name__ == "__main__":
             # Pick the best value [TRUTH INFERENCE] excluding the defective ones
             if len(sources_trusted_idx) > 0:
                 value_matrix = np.array([ Producers[_i].lastGeneratedSample for _i in sources_trusted_idx ])
-                inferred_truth = runTruthInference(value_matrix, algo=ALGO)
+                inferred_truth = runTruthInference(value_matrix, sources_trusted_indexers_rep, algo=TRUTH)
             else:
                 inferred_truth = np.inf # if everyone gave a nan response
             if _DEBUG_:
