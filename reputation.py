@@ -94,24 +94,6 @@ def runTruthInference(value_matrix, reputation_array, algo=constants.TRUTH_MED):
 
     return result if result else 0
 
-    # PROPOSED ALGORITHM BEGIN
-    # FUCK THIS ALGORITHM
-
-    # The matrix of values aligned on time
-    sync_matrix = value_matrix  # FIXME time processing is missing
-
-    # Autocorrelation: calculate standard deviation of every row (i.e. every candidate) and take the average as best_fluctuation
-    # Find the best source that has the closest std to best_fluct
-    autocorr = np.std(sync_matrix, axis=1)
-    best_fluct = np.mean(autocorr)
-    best_source_id = (np.absolute(autocorr - best_fluct)).argmin()
-
-    # Crosscorrelation: calculate standard deviation of every column (i.e. every instant) and take the minimum as best_time
-    crosscorr = np.std(sync_matrix, axis=0)
-    best_time_id = crosscorr.argmin()
-
-    return value_matrix[best_source_id, best_time_id]
-
 
 def printReputationToFile(dict, filename):
     with open(filename, "w") as outfile:
