@@ -1,53 +1,6 @@
+import constants
 import numpy as np
 import utils
-
-'''
-SOURCE:
-
-Sources are measuring temperature, the ground truth is 25C°, while the "False truth" is 10C°.
-For the moment, none of the source is defective (outputting null values here and there), we assume all of them are functioning correctly.
-Samples are generated according to a normal distribution around the groud truth and a variance that is assigned randomly to the source at its genesis (from 0 to 4)
-Values are assumed too distant from the ground truth (generating a negative rating) if the distance is more than 3.0C°
-Values are assumed not consistent (generating a negative rating) if the deviation from the mean of their own measures of this round is more than 1.5C°
-
-- Param:
-The BETA value: How much the score (distance from ground truth) is important in the rating versus the consistency.
-'''
-
-# A defective source sometimes outputs null values
-NULLIFY_PROB = 0.05
-RATIO_DEFECTIVE = 0.05
-DEFECTIVE = False
-
-# Max variance for trusted and untrusted sources for generating their value
-# Nullify probability is the probability to yield a null value (defective) for malicious
-MAX_VARIANCE = 4.0 # FIXME 4
-MAX_VARIANCE_UNTRUSTED = 4.0 # FIXME 12
-
-# Ground truth of the temperature value (we assume always the same) !CONST
-GROUND_TRUTH = 25
-FALSE_TRUTH = 10
-
-# What is the maximum error for a measurement that generates a score of 0 (a higher error value corresponds to a negative score) !CONST
-TOLERANCE = 3.0         # Tolerance for the distnace from ground truth
-DEVIATION_TOL = 1.5     # Tolerance for the consistency
-
-# How much the score (distance from ground truth) is important in the rating versus the consistency. !PARAM
-BETA_SOURCE = 0.9
-
-# Number of samples generated for each Source (Oracles)
-# This is the default number if not given by externally by the number of oracles.
-N_SAMPLES = 4
-
-# How much a new value is important over the history of old values (between 0 and 1)
-ALPHA_SOURCE = 0.5
-
-# This is the maximum speed (minimum avg ms taken for a Producer to answer a query)
-BASE_SPEED = 125.0
-SPEED_VARIANCE = 10.0
-
-# Initial reputation of a new indexer
-SOURCE_REPUTATION_INIT = 0
 
 # Global variable to assign an ID to Sources
 source_incremental_idx = 1
@@ -60,8 +13,19 @@ def generateNewProducer(trusted = True):
     _source = Source(trusted)
     Producers[_source.idx] = _source
     return _source.idx
-
 class Source:
+    '''
+    SOURCE:
+
+    Sources are measuring temperature, the ground truth is 25C°, while the "False truth" is 10C°.
+    For the moment, none of the source is defective (outputting null values here and there), we assume all of them are functioning correctly.
+    Samples are generated according to a normal distribution around the groud truth and a variance that is assigned randomly to the source at its genesis (from 0 to 4)
+    Values are assumed too distant from the ground truth (generating a negative rating) if the distance is more than 3.0C°
+    Values are assumed not consistent (generating a negative rating) if the deviation from the mean of their own measures of this round is more than 1.5C°
+
+    - Param:
+    The BETA value: How much the score (distance from ground truth) is important in the rating versus the consistency.
+    '''
 
     def __init__(self, trusted = True):
 
@@ -71,14 +35,14 @@ class Source:
         source_incremental_idx += 1
 
         self.trusted = trusted
-        self.defective = DEFECTIVE and np.random.rand() < RATIO_DEFECTIVE
+        self.defective = constants.SOURCE_DEFECTIVE and np.random.rand() < constants.SOURCE_RATIO_DEFECTIVE
         if trusted:
-            self.variance = MAX_VARIANCE * np.random.rand()
+            self.variance = constants.SOURCE_MAX_VARIANCE * np.random.rand()
         else:
-            self.variance = MAX_VARIANCE_UNTRUSTED * np.random.rand()
+            self.variance = constants.SOURCE_MAX_VARIANCE_UNTRUSTED * np.random.rand()
 
         # Speed goes from 125 to 165 on top of the variance. Shittier sensors are also slower
-        self.avg_speed = BASE_SPEED + self.variance * 10.0
+        self.avg_speed = constants.SOURCE_BASE_SPEED + self.variance * 10.0
         
         self.lastGeneratedSample = None
         self.last_request = None
@@ -86,40 +50,40 @@ class Source:
         self.last_deviation_array = None
         self.last_consistency_array = None
         self.last_score = None
-        self.internal_reputation = SOURCE_REPUTATION_INIT
+        self.internal_reputation = constants.SOURCE_SOURCE_REPUTATION_INIT
         return
 
     # @IVAN generate sample conditioned by the epoch?
     # Generate a number of data samples around the ground truth
-    def generateSample(self, request=None, n_samples=N_SAMPLES, beta=BETA_SOURCE):
+    def generateSample(self, request=None, n_samples=constants.SOURCE_N_SAMPLES, beta=constants.SOURCE_BETA_SOURCE):
         self.last_request = request
         if self.trusted:
-            self.lastGeneratedSample = np.random.normal(loc=GROUND_TRUTH, scale=self.variance, size=n_samples)
+            self.lastGeneratedSample = np.random.normal(loc=constants.GROUND_TRUTH, scale=self.variance, size=n_samples)
         else:
-            self.lastGeneratedSample = np.random.normal(loc=FALSE_TRUTH, scale=self.variance, size=n_samples)
+            self.lastGeneratedSample = np.random.normal(loc=constants.FALSE_TRUTH, scale=self.variance, size=n_samples)
 
         # Nullify if unstrusted
         if self.defective:
             for _idx, _x in enumerate(self.lastGeneratedSample):
-                if np.random.rand() < NULLIFY_PROB:
+                if np.random.rand() < constants.SOURCE_NULLIFY_PROB:
                     self.lastGeneratedSample[_idx] = None
         return self.lastGeneratedSample
     
     # This function outputs a single partial delay generated by the source
     def generateDelay(self):
-        return np.random.normal(self.avg_speed, SPEED_VARIANCE)
+        return np.random.normal(self.avg_speed, constants.SOURCE_SPEED_VARIANCE)
     
     # Update the last_score by calculating a new score using the lastGeneratedSample and the inferred truth
     def updateScore(self, _inferred_truth):
         
         # How much values are distant from the GROUND TRUTH
         self.last_score_array = np.array([ # NaN values handled natively
-            utils.constraintFunction(_x, TOLERANCE) for _x in np.absolute(self.lastGeneratedSample - _inferred_truth)
+            utils.constraintFunction(_x, constants.TOLERANCE) for _x in np.absolute(self.lastGeneratedSample - _inferred_truth)
         ])
 
         # How much values are distant from the LOCAL MEAN
         self.last_deviation_array = np.array([ # NaN values handled natively
-            utils.constraintFunction(_x, TOLERANCE) for _x in np.absolute(self.lastGeneratedSample - np.mean(self.lastGeneratedSample))
+            utils.constraintFunction(_x, constants.TOLERANCE) for _x in np.absolute(self.lastGeneratedSample - np.mean(self.lastGeneratedSample))
         ])
 
         # How much values are distant from the LOCAL MEAN but compared with other Oracles [THIS IS FOR ORACLES!]
@@ -130,10 +94,10 @@ class Source:
         # Calculate the rating using the new equation balanced by a parameter BETA.
         # INFO: Originally returning the minium (a.k.a. the best)
         # ----> self.last_score = np.min(self.last_score_array)
-        self.last_score = ( BETA_SOURCE * np.mean(self.last_score_array) )  + ( (1.0 - BETA_SOURCE) * np.mean(self.last_deviation_array))
+        self.last_score = ( constants.SOURCE_BETA_SOURCE * np.mean(self.last_score_array) )  + ( (1.0 - constants.SOURCE_BETA_SOURCE) * np.mean(self.last_deviation_array))
 
         # Update the internal reputation, this may help the INdexer in selecting sources...
-        self.internal_reputation = self.last_score * ALPHA_SOURCE + self.internal_reputation * (1 - ALPHA_SOURCE)
+        self.internal_reputation = self.last_score * constants.SOURCE_ALPHA_SOURCE + self.internal_reputation * (1 - constants.SOURCE_ALPHA_SOURCE)
 
     def print_self(self, verbose=False):
         head = "Trusted" if self.trusted else "Unstrusted"

@@ -1,20 +1,11 @@
 import numpy as np
 import Source
 import utils
+import constants
 
 from Source import Producers
 
-# How much a new value is important over the history of old values (between 0 and 1)
-ALPHA = 0.5
 
-# Initial reputation of a new indexer
-INDEXER_REPUTATION_INIT = 0
-
-# How many prouducers should be returned max to reply to a request
-MAX_PRODUCERS_REQUEST = 4
-POLICY_RANDOM = 0
-POLICY_WEIGHTED = 1
-POLICY = POLICY_WEIGHTED
 
 # Global variable to assign an ID to Indexers
 indexer_incremental_idx = 1
@@ -41,7 +32,7 @@ class Indexer:
         self.indexed_sources = []
         self.selected_producers = []
         self.last_request = None
-        self.reputation = INDEXER_REPUTATION_INIT
+        self.reputation = constants.INDEXER_REPUTATION_INIT
 
     # This function is called if the Indexer is succesfully selected as one of the replier
     def acceptRequest(self, request):
@@ -57,13 +48,13 @@ class Indexer:
             self.indexed_sources.append(source_id)
 
     # Return a list of producers to reply to the current query
-    def selectProducers(self, epoch, policy=POLICY):
+    def selectProducers(self, epoch, policy=constants.INDEXER_POLICY):
 
-        num_producers_to_select = min(MAX_PRODUCERS_REQUEST, len(self.indexed_sources))
+        num_producers_to_select = min(constants.INDEXER_MAX_PRODUCERS_REQUEST, len(self.indexed_sources))
 
-        if policy == POLICY_RANDOM:
+        if policy == constants.INDEXER_POLICY_RANDOM:
             selected = np.random.choice(self.indexed_sources, num_producers_to_select, replace=False) 
-        elif policy == POLICY_WEIGHTED:
+        elif policy == constants.INDEXER_POLICY_WEIGHTED:
             weights = [ (Producers[x].internal_reputation + 1) for x in self.indexed_sources]
             selected = np.random.choice(self.indexed_sources, num_producers_to_select, p=(weights/np.sum(weights)), replace=False)
         else:
@@ -89,7 +80,7 @@ class Indexer:
         avg_score = avg_score / scores
         
         # Update the reputation
-        self.reputation = avg_score * ALPHA + self.reputation * (1.0 - ALPHA)
+        self.reputation = avg_score * constants.INDEXER_ALPHA + self.reputation * (1.0 - constants.INDEXER_ALPHA)
 
     def print_self(self, verbose=False):
         head = "Trusted" if self.trusted else "Unstrusted"
