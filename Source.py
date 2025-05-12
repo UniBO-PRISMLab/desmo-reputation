@@ -89,6 +89,7 @@ class Source:
         self.internal_reputation = SOURCE_REPUTATION_INIT
         return
 
+    # @IVAN generate sample conditioned by the epoch?
     # Generate a number of data samples around the ground truth
     def generateSample(self, request=None, n_samples=N_SAMPLES, beta=BETA_SOURCE):
         self.last_request = request

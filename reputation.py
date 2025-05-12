@@ -26,7 +26,7 @@ TRUTH_MED = 1
 TRUTH_WAVG = 2
 
 ALGO = ALGO_REP
-TRUTH = TRUTH_WAVG
+TRUTH = TRUTH_MED
 
 # Total number of oracles
 O = 20
@@ -227,6 +227,7 @@ if __name__ == "__main__":
     S_0 = int(S * RATIO_COLD_START)
     S_remainder = S - S_0
 
+    # @IVAN This shuck of code regulates the arrival rate of the second half of sources over the simulation
     # Array of arrival and of malicious
     # arrivals = np.random.randint(0, high=N_EPOCHS*RATIO_EPOCHS_ARRIVALS, size=S_remainder) OLD ARRIVALS
     arrivals = np.random.randint(int(N_EPOCHS / 3.0), high=int(N_EPOCHS / 3.0 * 2.0), size=S_remainder) # FIXME magic numbers
@@ -267,6 +268,7 @@ if __name__ == "__main__":
     for _i in range(I):
         Indexer.generateNewIndexer(trusted=(_i not in idx_malicious_indexers))
     
+    # @IVAN Create the first batch of sources some of them are malicious?
     # Fill up the dict of sources and assign each of them to indexers
     for _ in range(S_0):
         createNewProducer()
@@ -291,6 +293,7 @@ if __name__ == "__main__":
             if _DEBUG_:
                 print(f"\n\n////// EPOCH {epoch} \\\\\\\\\\\\")
 
+            # @IVAN Skip?
             # Generate new sources if the time has come - evaluate if malicious
             while (len(arrivals) > 0 and epoch == arrivals[0]):
                 _trusted = (arrivals_malicious[0] == 0.0) #(np.random.rand() >= RATIO_MALICIOUS)
@@ -304,6 +307,7 @@ if __name__ == "__main__":
                 if not _trusted:
                     counter_malign += 1
 
+            # @IVAN pick oracles?
             # Pick candidate Oracles for the next measurement [selected_oracles is the list of ids]
             if ALGO == ALGO_AVG:
                 weights = [1.0 for _o in Oracles] # Algo average does not care about the weights nor the ranking
@@ -316,6 +320,7 @@ if __name__ == "__main__":
                 # This happens if there are less oracles than I need so I need to take them all
                 selected_oracles = indices
 
+            # @IVAN pick indexer?
             # Pick candidate Indexers for the next measurement
             indices = list([_i for _i in Indexers.keys() if (len(Indexers[_i].indexed_sources) > 0)]) # Only choose from Indexers with at least one producer
             if ALGO == ALGO_AVG:
@@ -441,7 +446,7 @@ if __name__ == "__main__":
                     str(counter_indexers_malign),                    # NUMBER OF MALIGN INDEXERS (active or banned)
                     str(counter_indexers_banned),                      # NUMBER OF INDEXERS (banned)
                     str(counter_indexers_banned_malign),             # NUMBER OF MALIGN INDEXERS (banned)
-                    str(inferred_truth),                            # CONSENSUS ACHIEVED
+                    str(inferred_truth),                            # CONSENSUS ACHIEVED @IVAN this is the one you need
                     str(avg_reputation_benign),                     # AVERAGE REPUTATION OF BENIGN SOURCES
                     str(avg_reputation_malign)                      # AVERAGE REPUTATION OF MALIGN SOURCES
                 ]) + "\n"
