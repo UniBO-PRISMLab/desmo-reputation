@@ -5,11 +5,16 @@ import Indexer
 import Source
 import Oracle
 import constants
+from mode import Mode
+from startegies import chainlink, diorsgx
+import use_case
 import utils
 from tqdm import tqdm
 
 from Source import Producers
 from Indexer import Indexers
+from truth_inference_checker import truth_inference_checkers
+from owner import owners
 
 # Oracles Master Dictionary
 Oracles = {}
@@ -23,18 +28,20 @@ Ranking_avg = []
 # Banned Master Array
 Banlist = []
 
+truth_checker = truth_inference_checkers[constants.TRUTH_INFERENCE]
+
 
 # Create new producer, add it to the global list and register it to a random number of indexers
-def createNewProducer(trusted=True):
+def createNewProducer(trusted=True, owner=1):
     _prod_idx = Source.generateNewProducer(trusted=trusted)
 
-    interesting_indexers = []  # Let us list only the indexers constants.I want to be enrolled in
+    interesting_indexers = []  # Let us list only the indexers I want to be enrolled in
     if (
         constants.RATIO_MALICIOUS_INDEXERS > 0 and constants.VERTICAL_ATTACK
-    ):  # If constants.I am good, then we only select good indexers and vice versa
+    ):  # If I am good, then we only select good indexers and vice versa
         interesting_indexers = [i for i in list(Indexers.keys()) if (Indexers[i].trusted == trusted)]
     if len(interesting_indexers) == 0:  # Let us distribute into every indexer
-        interesting_indexers = list(Indexers.keys())
+        interesting_indexers = [indexer_key for indexer_key in Indexers if Indexers[indexer_key].owner == owner]
 
     # Long Tail pareto distribution
     # _n_indexers = np.random.randint(1, len(interesting_indexers)) # Register to random number of Indexers
@@ -104,6 +111,7 @@ def printReputationToFile(dict, filename):
 if __name__ == "__main__":
     # Get parameters from ARGV
 
+    # TODO: fix according to the refactor
     if len(sys.argv) >= 9:
         # REPUTATION_MIN
         REPUTATION_MIN = float(sys.argv[1])
@@ -141,7 +149,6 @@ if __name__ == "__main__":
 
     # @IVAN This shuck of code regulates the arrival rate of the second half of sources over the simulation
     # Array of arrival and of malicious
-    # arrivals = np.random.randint(0, high=N_EPOCHS*RATIO_EPOCHS_ARRIVALS, size=S_remainder) OLD ARRIVALS
     arrivals = np.random.randint(
         int(constants.N_EPOCHS / 3.0), high=int(constants.N_EPOCHS / 3.0 * 2.0), size=S_remainder
     )  # FIXME magic numbers
@@ -187,13 +194,20 @@ if __name__ == "__main__":
     counter_indexers_malign = len(idx_malicious_indexers)
     counter_indexers_banned = 0
     counter_indexers_banned_malign = 0
-    for _i in range(constants.I):
-        Indexer.generateNewIndexer(trusted=(_i not in idx_malicious_indexers))
+    for owner in owners:
+        print(owner)
+        for _ in range(owner.number_of_indexers):
+            Indexer.generateNewIndexer(trusted=True, owner=owner.identifier)
+        for _ in range(owner.number_of_producers):
+            createNewProducer(owner=owner.identifier)
+
+    # for _i in range(constants.I):
+    #        Indexer.generateNewIndexer(trusted=(_i not in idx_malicious_indexers))
 
     # @IVAN Create the first batch of sources some of them are malicious?
     # Fill up the dict of sources and assign each of them to indexers
-    for _ in range(S_0):
-        createNewProducer()
+    # for _ in range(S_0):
+    #    createNewProducer()
 
     counter_sources = S_0
     counter_malign = 0
@@ -203,31 +217,31 @@ if __name__ == "__main__":
     # NUmber of times the inferred truth is far from the reality
     counter_fail = 0
     counter_tot = 0
+    counter_sequential_fail = 0
 
-    # try:
     print("Algorithm: " + constants.ALGO_LIST[constants.ALGO])
+
+    attack_epoch = use_case.define_start_attack_epoch()
 
     # EPOCH START
     with open(constants.FILE_OUT, "w") as outfile:
+        fail_counter = 0
         for epoch in tqdm(range(constants.N_EPOCHS)):
             if constants._DEBUG_:
                 print(f"\n\n////// EPOCH {epoch} \\\\\\\\\\\\")
+            if epoch == attack_epoch:
+                print(f" ATTACK EPOCH: {epoch}")
+                counter_indexers_malign = use_case.turn_indexers(indexers=list(Indexers.values()))
 
-            # @IVAN Skip?
-            # Generate new sources if the time has come - evaluate if malicious
-            while len(arrivals) > 0 and epoch == arrivals[0]:
-                _trusted = arrivals_malicious[0] == 0.0  # (np.random.rand() >= RATIO_MALICIOUS)
+            if constants.MODE == Mode.DIORSGX:
+                diorsgx.do_DiorSGx(epoch, outfile, truth_checker)
+                continue
 
-                # Source Creation
-                createNewProducer(trusted=_trusted)
+            elif constants.MODE == Mode.CHAINLINK:
+                # select random source
+                chainlink.do_chainlink(epoch, outfile, truth_checker)
+                continue
 
-                arrivals = np.delete(arrivals, 0)
-                arrivals_malicious = np.delete(arrivals_malicious, 0)
-                counter_sources += 1
-                if not _trusted:
-                    counter_malign += 1
-
-            # @IVAN pick oracles?
             # Pick candidate Oracles for the next measurement [selected_oracles is the list of ids]
             if constants.ALGO == constants.ALGO_AVG:
                 weights = [1.0 for _o in Oracles]  # Algo average does not care about the weights nor the ranking
@@ -239,10 +253,9 @@ if __name__ == "__main__":
                     indices, constants.O_req, p=(weights / np.sum(weights)), replace=False
                 )
             else:
-                # This happens if there are less oracles than constants.I need so constants.I need to take them all
+                # This happens if there are less oracles than .I need so .I need to take them all
                 selected_oracles = indices
 
-            # @IVAN pick indexer?
             # Pick candidate Indexers for the next measurement
             indices = list(
                 [_i for _i in Indexers.keys() if (len(Indexers[_i].indexed_sources) > 0)]
@@ -256,7 +269,7 @@ if __name__ == "__main__":
                     indices, constants.S_req, p=(weights / np.sum(weights)), replace=False
                 )
             else:
-                # This happens if constants.I kicked out so many indexers that constants.I need to take them all
+                # This happens if I kicked out so many indexers that I need to take them all
                 candidates_indices = indices
             for _i in candidates_indices:
                 Indexers[_i].acceptRequest(epoch)  # Record the acceptance of the request for each selected indexer
@@ -271,10 +284,10 @@ if __name__ == "__main__":
                 ]
                 sources_idx.extend(
                     _selected_producers_for_indexer
-                )  # With this constants.I take all sources from the candidate indexer
+                )  # With this I take all sources from the candidate indexer
                 sources_indexers_rep.extend(
                     Indexers[_i].reputation for _ in _selected_producers_for_indexer
-                )  # For every added producer constants.I also record the reputation of the related indexer
+                )  # For every added producer I also record the reputation of the related indexer
 
             # Generate sample for all producers that are indexed by the Candidate Indexes
             # All producers generate one sample for each querying oracle
@@ -308,10 +321,11 @@ if __name__ == "__main__":
             if constants._DEBUG_:
                 print(f"----> INFERRED TRUTH: {inferred_truth}")
             counter_tot += 1
-            if (
-                abs(inferred_truth - constants.GROUND_TRUTH) > constants.TOLERANCE
-            ):  # Check if the query result is compromised
+            if truth_checker(inferred_truth):
                 counter_fail += 1
+                counter_sequential_fail += 1
+            else:
+                counter_sequential_fail = 0
 
             # Construct the Delay Matrix for calcualting the Oracle delays (same shape as value matrix)
             delay_matrix = np.zeros_like(
@@ -395,20 +409,19 @@ if __name__ == "__main__":
                 if counter_indexers_malign
                 else 0.0
             )
-            outfile.write(
-                ",".join(
-                    [
-                        str(epoch),  # TIME
-                        str(counter_indexers_created),  # NUMBER OF INDEXERS (active or banned)
-                        str(counter_indexers_malign),  # NUMBER OF MALIGN INDEXERS (active or banned)
-                        str(counter_indexers_banned),  # NUMBER OF INDEXERS (banned)
-                        str(counter_indexers_banned_malign),  # NUMBER OF MALIGN INDEXERS (banned)
-                        str(inferred_truth),  # CONSENSUS ACHIEVED @IVAN this is the one you need
-                        str(avg_reputation_benign),  # AVERAGE REPUTATION OF BENIGN SOURCES
-                        str(avg_reputation_malign),  # AVERAGE REPUTATION OF MALIGN SOURCES
-                    ]
-                )
-                + "\n"
+            utils.write_simulation_result(
+                outfile=outfile,
+                mode_name=Mode.ZONIA,
+                epoch=epoch,
+                fail_counter=counter_fail,
+                consolidated_result=counter_sequential_fail >= constants.CONTRACT_READS,
+                counter_indexers_created=counter_indexers_created,
+                counter_indexers_malign=counter_indexers_malign,
+                counter_indexers_banned=counter_indexers_banned,
+                counter_indexers_banned_malign=counter_indexers_banned_malign,
+                inferred_truth=inferred_truth,
+                avg_reputation_benign=avg_reputation_benign,
+                avg_reputation_malign=avg_reputation_malign,
             )
 
     # EPOCH END
@@ -431,7 +444,8 @@ if __name__ == "__main__":
             (counter_indexers_banned_malign / counter_indexers_malign) if counter_indexers_banned else 0
         )
     )
-    print("Ground Truth Accuracy {}".format(1.0 - float(counter_fail) / float(counter_tot)))
+    if counter_tot > 0:
+        print("Ground Truth Accuracy {}".format(1.0 - float(counter_fail) / float(counter_tot)))
 
     # printReputationToFile(Indexers, "repIndexers.csv")
     # printReputationToFile(Oracles, "repOracles.csv")

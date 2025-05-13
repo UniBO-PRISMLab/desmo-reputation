@@ -1,3 +1,4 @@
+from typing import Dict
 import constants
 import numpy as np
 import utils
@@ -6,13 +7,7 @@ import utils
 source_incremental_idx = 1
 
 # GLOBAL DICTIONARY OF SOURCES
-Producers = {}
 
-# Factory method to create a new source and add it to the Producers
-def generateNewProducer(trusted = True):
-    _source = Source(trusted)
-    Producers[_source.idx] = _source
-    return _source.idx
 class Source:
     '''
     SOURCE:
@@ -36,10 +31,7 @@ class Source:
 
         self.trusted = trusted
         self.defective = constants.SOURCE_DEFECTIVE and np.random.rand() < constants.SOURCE_RATIO_DEFECTIVE
-        if trusted:
-            self.variance = constants.SOURCE_MAX_VARIANCE * np.random.rand()
-        else:
-            self.variance = constants.SOURCE_MAX_VARIANCE_UNTRUSTED * np.random.rand()
+        self.set_variance()
 
         # Speed goes from 125 to 165 on top of the variance. Shittier sensors are also slower
         self.avg_speed = constants.SOURCE_BASE_SPEED + self.variance * 10.0
@@ -52,6 +44,22 @@ class Source:
         self.last_score = None
         self.internal_reputation = constants.SOURCE_SOURCE_REPUTATION_INIT
         return
+    
+    @property
+    def trusted(self) -> bool:
+        return self._trusted
+
+    @trusted.setter
+    def trusted(self, value: bool) -> None:
+        self._trusted = value
+        self.set_variance()
+            
+    def set_variance(self) -> None:
+        if self.trusted:
+            self.variance = constants.SOURCE_MAX_VARIANCE * np.random.rand()
+        else:
+            self.variance = constants.SOURCE_MAX_VARIANCE_UNTRUSTED * np.random.rand()
+        
 
     # @IVAN generate sample conditioned by the epoch?
     # Generate a number of data samples around the ground truth
@@ -111,3 +119,11 @@ class Source:
                  + " \n\t Last Deviations: " + str(self.last_deviation_array)
                  + " \n\t Last Rating: " + str(self.last_score)
                  + " \n\t Internal Reputation: " + str(self.internal_reputation))
+
+Producers: Dict[int, Source] = {}
+
+# Factory method to create a new source and add it to the Producers
+def generateNewProducer(trusted = True):
+    _source = Source(trusted)
+    Producers[_source.idx] = _source
+    return _source.idx
