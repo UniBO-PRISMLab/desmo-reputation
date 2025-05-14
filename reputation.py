@@ -278,7 +278,7 @@ if __name__ == "__main__":
                 Producers[_i].generateSample(request=epoch, n_samples=len(selected_oracles))
                 # Pick candidates indices for which there is no null value
                 if all(not utils.isNull(_val) for _val in Producers[_i].lastGeneratedSample) or (
-                    ALGO == constants.ALGO_AVG
+                    constants.ALGO == constants.ALGO_AVG
                 ):
                     sources_trusted_idx.append(_i)
                     sources_trusted_indexers_rep.append(sources_indexers_rep[_i_idx])
