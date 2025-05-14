@@ -6,6 +6,7 @@ import Source
 import Oracle
 import constants
 from mode import Mode
+from parser import apply_arguments_to_constants, parse_args
 from startegies import chainlink, diorsgx
 import use_case
 import utils
@@ -110,38 +111,8 @@ def printReputationToFile(dict, filename):
 
 if __name__ == "__main__":
     # Get parameters from ARGV
-
-    # TODO: fix according to the refactor
-    if len(sys.argv) >= 9:
-        # REPUTATION_MIN
-        REPUTATION_MIN = float(sys.argv[1])
-        # RATIO_MALICIOUS
-        RATIO_MALICIOUS_INDEXERS = float(sys.argv[2])
-
-        # ALPHA
-        Indexer.ALPHA = float(sys.argv[3])
-        Source.ALPHA_SOURCE = float(sys.argv[3])
-        Oracle.ALPHA = float(sys.argv[3])
-        # TOLERANCE
-        TOLERANCE = float(sys.argv[4])
-        # FILE
-        FILE_OUT = sys.argv[5]
-        # ALGO
-        ALGO = int(sys.argv[6])
-        # Arrival Rate
-        ARRIVAL_RATE = sys.argv[7]
-        # Beta
-        Source.BETA_SOURCE = float(sys.argv[8])
-        # Ratio Malicious Oracles
-        RATIO_MALICIOUS_ORACLES = float(sys.argv[9])
-        # Truth inference algorithm
-        TRUTH = int(sys.argv[10])
-
-    # Check if we are compromised (i.e. Malicious Oracles and Indexers are taking up MORE than 50% of the value matrix) FIXME we still try
-    # malicious_power = constants.RATIO_MALICIOUS_INDEXERS + constants.RATIO_MALICIOUS_ORACLES - constants.RATIO_MALICIOUS_ORACLES * constants.RATIO_MALICIOUS_INDEXERS
-    # if malicious_power > 0.5:
-    #     # Skip the simulation, there's no point
-    #     sys.exit()
+    args = parse_args()
+    apply_arguments_to_constants(args)
 
     # Number of sources present at cold start and its dual
     S_0 = int(constants.S * constants.RATIO_COLD_START)
