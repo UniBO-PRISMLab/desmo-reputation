@@ -1,4 +1,3 @@
-import random
 import numpy as np
 
 from typing import List
@@ -53,9 +52,9 @@ def define_start_attack_epoch(
     return np.random.randint(chunk_size) + start_epoch
 
 
-def turn_indexers(indexers: List[Indexer], owner: int = 1) -> int:
+def turn_indexers(indexers: List[Indexer], owner: int = 0) -> int:
     """
-    Turns a subset of trusted indexers into malicious ones.
+    Turns a subset of trusted indexers into malicious ones and the malicious ones in trusted. 
 
     returns the number of turned indexers
     """ 
@@ -63,7 +62,7 @@ def turn_indexers(indexers: List[Indexer], owner: int = 1) -> int:
     for indexer in indexers:
         if indexer.owner == owner:
             turned_indexers+=1
-            indexer.trusted = False
+            indexer.trusted = not indexer.trusted
             for source_id in indexer.indexed_sources:
-                Producers[source_id].trusted = False
+                Producers[source_id].trusted = indexer.trusted
     return turned_indexers

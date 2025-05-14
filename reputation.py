@@ -32,7 +32,7 @@ truth_checker = truth_inference_checkers[constants.TRUTH_INFERENCE]
 
 
 # Create new producer, add it to the global list and register it to a random number of indexers
-def createNewProducer(trusted=True, owner=1):
+def createNewProducer(trusted=True, owner=0):
     _prod_idx = Source.generateNewProducer(trusted=trusted)
 
     interesting_indexers = []  # Let us list only the indexers I want to be enrolled in
@@ -223,6 +223,12 @@ if __name__ == "__main__":
 
     attack_epoch = use_case.define_start_attack_epoch()
 
+    for indexer in Indexers.values():
+        if not indexer.trusted:
+            raise ValueError("All Indexers should be trusted at epoch 0")
+    for source in Producers.values():
+        if not source.trusted:
+            raise ValueError("All Producers should be trusted at epoch 0")
     # EPOCH START
     with open(constants.FILE_OUT, "w") as outfile:
         fail_counter = 0
@@ -232,9 +238,13 @@ if __name__ == "__main__":
             if epoch == attack_epoch:
                 print(f" ATTACK EPOCH: {epoch}")
                 counter_indexers_malign = use_case.turn_indexers(indexers=list(Indexers.values()))
+                print(f"Turned {counter_indexers_malign} indexers into malicious")
+            if epoch == attack_epoch + constants.ATTACK_DURATION + 1:
+                print(f" ATTACK FINISHED: {epoch}")
+                use_case.turn_indexers(indexers=list(Indexers.values()))
 
             if constants.MODE == Mode.DIORSGX:
-                diorsgx.do_DiorSGx(epoch, outfile, truth_checker)
+                diorsgx.do_DiorSGX(epoch, outfile, truth_checker)
                 continue
 
             elif constants.MODE == Mode.CHAINLINK:
@@ -316,6 +326,8 @@ if __name__ == "__main__":
             if len(sources_trusted_idx) > 0:
                 value_matrix = np.array([Producers[_i].lastGeneratedSample for _i in sources_trusted_idx])
                 inferred_truth = runTruthInference(value_matrix, sources_trusted_indexers_rep, algo=constants.TRUTH)
+                # if epoch >= attack_epoch and epoch <= attack_epoch + constants.ATTACK_DURATION:
+                #     print(value_matrix)
             else:
                 inferred_truth = np.inf  # if everyone gave a nan response
             if constants._DEBUG_:
@@ -423,6 +435,11 @@ if __name__ == "__main__":
                 avg_reputation_benign=avg_reputation_benign,
                 avg_reputation_malign=avg_reputation_malign,
             )
+            if epoch >= attack_epoch and epoch <= attack_epoch + constants.ATTACK_DURATION:
+                print(f"inferred truth: {inferred_truth}")
+            if counter_sequential_fail >= constants.CONTRACT_READS:
+                print("FAILED!!!")
+                sys.exit(0)
 
     # EPOCH END
 

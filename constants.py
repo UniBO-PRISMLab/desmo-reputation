@@ -35,7 +35,7 @@ if _TESTING_:
     S = 200
 
 # Number of Epochs (the ratio for arrivals is the ratio of epochs in which we add up sources)
-N_EPOCHS = 300
+N_EPOCHS = 1000
 if _TESTING_:
     N_EPOCHS = 60
 
@@ -70,7 +70,7 @@ REPUTATION_MIN = -0.40
 
 # FILE where to write the results
 FILE_OUT = "REP.csv"
-GROUND_TRUTH = 5
+GROUND_TRUTH = 17
 FALSE_TRUTH = 50
 
 THRESHOLD = 42
@@ -132,9 +132,10 @@ SOURCE_SPEED_VARIANCE = 10.0
 SOURCE_SOURCE_REPUTATION_INIT = 0
 
 TRUTH_INFERENCE = "greater_equal"
-CONTRACT_READS = 3
-THRESHOLD = 42
+CONTRACT_READS = 5
+THRESHOLD = 30
 
 FARMERS_RATIO = 0.5
 INSURANCE_RATIO = 0.5
-OTHER_RATIO = 0.1
+OTHER_RATIO = 0.05
+ATTACK_DURATION = 30

@@ -1,3 +1,4 @@
+import random
 from statistics import mean
 
 import numpy as np
@@ -21,8 +22,8 @@ def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> Non
     """
     global fail_counter, sequential_fail_counter
 
-    values = [source.generateSample() for source in Producers.values()]
-    inferred_truth = mean([item for row in values for item in row])
+    source = random.choice(list(Producers.values()))
+    inferred_truth = mean(source.generateSample())
     is_valid = truth_checker(inferred_truth)
 
     if not is_valid:
@@ -32,6 +33,9 @@ def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> Non
 
     fail_counter += sequential_fail_counter
 
+    if sequential_fail_counter >= constants.CONTRACT_READS:
+        print("FAILED")
+        
         
     utils.write_simulation_result(
         outfile=file,

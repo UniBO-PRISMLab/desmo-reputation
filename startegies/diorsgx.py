@@ -18,11 +18,10 @@ def do_DiorSGX(epoch: int, file, truth_checker: TruthInferenceFunction) -> None:
         truth_checker (TruthInferenceFunction): Function used to validate inferred truth.
     """
     global fail_counter, sequential_fail_counter
-    
+
     values = [source.generateSample() for source in Producers.values()]
-    inferred_truth = mean(values)
+    inferred_truth = mean([item for row in values for item in row])
     is_valid = truth_checker(inferred_truth)
-    
 
     if not is_valid:
         sequential_fail_counter += 1
@@ -30,7 +29,8 @@ def do_DiorSGX(epoch: int, file, truth_checker: TruthInferenceFunction) -> None:
         sequential_fail_counter = 0
 
     fail_counter += sequential_fail_counter
-        
+
+
     utils.write_simulation_result(
         outfile=file,
         epoch=epoch,

@@ -108,7 +108,7 @@ class Indexer:
 Indexers: Dict[int, Indexer] = {}
 
 # Factory method to create a new Indexer and add it to the Indexers
-def generateNewIndexer(trusted=True, owner=1):
+def generateNewIndexer(trusted=True, owner=0):
     _indexer = Indexer(trusted, owner)
     Indexers[_indexer.idx] = _indexer
     return _indexer.idx
