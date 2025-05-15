@@ -4,7 +4,7 @@ _TESTING_ = False
 _DEBUG_ = False
 
 
-MODE = Mode.CHAINLINK
+MODE = Mode.ZONIA
 # ALGORITHMS
 ALGO_AVG = 0         # Computes only the average
 ALGO_MED = 1         # Computes the median and uses the ranking
@@ -15,9 +15,10 @@ ALGO_LIST = ["Average", "Median + Ranking", "Reputation"]
 TRUTH_AVG = 0
 TRUTH_MED = 1
 TRUTH_WAVG = 2
+TRUTH_WMED = 3
 
 ALGO = ALGO_REP
-TRUTH = TRUTH_MED
+TRUTH = TRUTH_WMED
 
 # Total number of oracles
 O = 20
