@@ -27,7 +27,7 @@ TOLERANCE_arr = [3.0]
 ALGO = [0, 1, 2]
 
 # TRUTH INFERENCE
-TRUTH = [0, 1, 2]
+TRUTH = [3] #[0, 1, 2, 3]
 
 ARRIVAL_RATE_arr = ['uniform', 'bursty']
 
