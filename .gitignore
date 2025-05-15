@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+results-owner-ratios/
 .Python
 build/
 develop-eggs/
