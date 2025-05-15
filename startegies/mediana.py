@@ -1,7 +1,4 @@
-import random
-from statistics import mean
-
-import numpy as np
+from statistics import median
 
 from Source import Producers
 import constants
@@ -11,10 +8,10 @@ import utils
 fail_counter = 0
 sequential_fail_counter = 0 
 
-def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> None:
+def do_median(epoch: int, file, truth_checker: TruthInferenceFunction) -> None:
     """
-    Executes one simulation step using the Chainlink strategy.
-    Takes the value from a random sensor. 
+    Executes one simulation step using the DiorSGX strategy.
+
     Args:
         epoch (int): Current epoch number.
         file: Output file object.
@@ -22,9 +19,8 @@ def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> Non
     """
     global fail_counter, sequential_fail_counter
 
-    source = random.choice(list(Producers.values()))
-    inferred_truth = mean(source.generateSample())
-
+    values = [source.generateSample() for source in Producers.values()]
+    inferred_truth = median([item for row in values for item in row])
     if inferred_truth >= constants.THRESHOLD:
         sequential_fail_counter += 1
     else:
@@ -32,7 +28,6 @@ def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> Non
 
     fail_counter += sequential_fail_counter
 
-        
     utils.write_simulation_result(
         outfile=file,
         epoch=epoch,
@@ -41,4 +36,3 @@ def do_chainlink(epoch: int, file, truth_checker: TruthInferenceFunction) -> Non
         fail_counter=fail_counter,
         consolidated_result= sequential_fail_counter >= constants.CONTRACT_READS
     )
-
