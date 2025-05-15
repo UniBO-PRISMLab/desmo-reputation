@@ -99,6 +99,31 @@ def runTruthInference(value_matrix, reputation_array, algo=constants.TRUTH_MED):
         # Normalize the reputation matrix
         reputation_matrix /= np.sum(reputation_matrix)
         result = np.nansum(value_matrix * reputation_matrix)
+    elif algo == constants.TRUTH_WMED:
+        # get the dimensions of the value matrix
+        n_rows, n_cols = value_matrix.shape
+        # extend the reputation array to match the value matrix
+        reputation_matrix = np.transpose(np.tile([float(_r) for _r in reputation_array], (n_cols, 1)))
+        reputation_matrix += 1 # Make everything positive
+        # Normalize the reputation matrix
+        reputation_matrix /= np.sum(reputation_matrix)
+        # Flatten the value matrix and the reputation matrix
+        value_matrix_flat = value_matrix.flatten()
+        reputation_matrix_flat = reputation_matrix.flatten()
+
+        # Get the indices that would sort the arrays
+        sort_indices = np.argsort(value_matrix_flat)
+
+        # Sort the arrays based on the sorted indices
+        sorted_values = value_matrix_flat[sort_indices]
+        sorted_reputations = reputation_matrix_flat[sort_indices]
+        # Calculate the cumulative sum of the reputations
+        cumulative_reputations = sorted_reputations.cumsum()
+        # Calculate the cutoff as half of the total reputation
+        cutoff = sorted_reputations.sum() / 2
+
+        # return the value at the index where the cumulative reputation exceeds the cutoff
+        result = sorted_values[cumulative_reputations >= cutoff][0]
 
     return result if result else 0
 
