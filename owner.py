@@ -19,39 +19,29 @@ class Owner:
         to_print += f" has {self.number_of_indexers} indexers and {self.number_of_producers} producers"
         return to_print
 
-
-# Base resources (excluding "others")
-base_indexers = constants.I / (1 + constants.OTHER_RATIO)
-base_producers = constants.S / (1 + constants.OTHER_RATIO)
-
-# Allocate to main owners (whose ratios sum to 1)
-farmer = Owner(
-    name="farmer",
-    number_of_indexers=int(constants.FARMERS_RATIO * base_indexers),
-    number_of_producers=int(constants.FARMERS_RATIO * base_producers),
-)
-insurance = Owner(
-    name="insurance",
-    number_of_indexers=int(constants.INSURANCE_RATIO * base_indexers),
-    number_of_producers=int(constants.INSURANCE_RATIO * base_producers),
-)
-
-owners = [farmer, insurance]
-
-if constants.MODE == Mode.ZONIA:
-    others = Owner(
-        name="others",
-        number_of_indexers=int(constants.OTHER_RATIO * base_indexers),
-        number_of_producers=int(constants.OTHER_RATIO * base_producers),
+def set_farmers_insurance_owners() -> list[Owner]:
+    base_indexers = constants.I
+    base_producers = constants.S
+    
+    farmer = Owner(
+        name="farmer",
+        number_of_indexers=int(constants.FARMERS_RATIO * base_indexers),
+        number_of_producers=int(constants.FARMERS_RATIO * base_producers),
     )
-    owners.append(others)
+    insurance = Owner(
+        name="insurance",
+        number_of_indexers=int(constants.INSURANCE_RATIO * base_indexers),
+        number_of_producers=int(constants.INSURANCE_RATIO * base_producers),
+    )
 
-total_indexers = sum(owner.number_of_indexers for owner in owners)
-total_producers = sum(owner.number_of_producers for owner in owners)
+    owners = [farmer, insurance]
 
-indexer_diff = constants.I - total_indexers
-producer_diff = constants.S - total_producers
+    if constants.MODE == Mode.ZONIA and constants.OTHER_RATIO > 0.0:
+        others = Owner(
+            name="others",
+            number_of_indexers=int(constants.OTHER_RATIO * base_indexers),
+            number_of_producers=int(constants.OTHER_RATIO * base_producers),
+        )
+        owners.append(others)
 
-if owners:
-    owners[-1].number_of_indexers += indexer_diff
-    owners[-1].number_of_producers += producer_diff
+    return owners

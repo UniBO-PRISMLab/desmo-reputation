@@ -34,23 +34,25 @@ def write_simulation_result(
     """
     Writes the simulation result to the specified output file.
 
-    For general modes, it records the epoch, mode, inferred truth, and result validity.
-    For ZONIA mode, it includes detailed statistics on indexers and reputations.
-
-    Parameters:
-    - outfile: File object opened in write or append mode.
-    - epoch (int): The current epoch of the simulation.
-    - mode_name (str): Strategy or mode identifier (e.g., "CHAINLINK", "ZONIA").
-    - inferred_truth: The inferred truth value (can be numeric or string).
-    - consolidated_result (bool, optional): Whether the inferred truth is considered valid.
-    - counter_indexers_created (int, optional): Total indexers created (ZONIA only).
-    - counter_indexers_malign (int, optional): Malicious indexers created (ZONIA only).
-    - counter_indexers_banned (int, optional): Indexers that were banned (ZONIA only).
-    - counter_indexers_banned_malign (int, optional): Malicious indexers that were banned (ZONIA only).
-    - avg_reputation_benign (float, optional): Avg. reputation of benign sources (ZONIA only).
-    - avg_reputation_malign (float, optional): Avg. reputation of malicious sources (ZONIA only).
+    If it's the first line of the file, it also writes a header with column names.
     """
-    if mode_name.value == "ZONIA":
+
+    is_first_line = outfile.tell() == 0
+
+    if mode_name.value == Mode.ZONIA:
+        headers = [
+            "epoch",
+            "indexers_created",
+            "indexers_malign",
+            "indexers_banned",
+            "indexers_banned_malign",
+            "inferred_truth",
+            "avg_rep_benign",
+            "avg_rep_malign",
+            "mode",
+            "fail_counter",
+            "consolidated_result",
+        ]
         fields = [
             epoch,
             counter_indexers_created,
@@ -60,10 +62,18 @@ def write_simulation_result(
             inferred_truth,
             avg_reputation_benign,
             avg_reputation_malign,
+            mode_name.value,
             fail_counter,
             consolidated_result,
         ]
     else:
+        headers = [
+            "epoch",
+            "mode",
+            "inferred_truth",
+            "fail_counter",
+            "consolidated_result",
+        ]
         fields = [
             epoch,
             mode_name.value,
@@ -72,5 +82,7 @@ def write_simulation_result(
             consolidated_result,
         ]
 
-    line = ",".join(str(field) for field in fields) + "\n"
-    outfile.write(line)
+    if is_first_line:
+        outfile.write(",".join(headers) + "\n")
+
+    outfile.write(",".join(str(field) for field in fields) + "\n")

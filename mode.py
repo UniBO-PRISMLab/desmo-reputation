@@ -4,3 +4,4 @@ class Mode(str, Enum):
     ZONIA = "zonia"
     DIORSGX = "dior"
     CHAINLINK = "chainlink"
+    MEDIAN = "median"

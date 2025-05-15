@@ -7,7 +7,7 @@ import Oracle
 import constants
 from mode import Mode
 from parser import apply_arguments_to_constants, parse_args
-from startegies import chainlink, diorsgx
+from startegies import chainlink, diorsgx, mediana
 import use_case
 import utils
 from tqdm import tqdm
@@ -15,7 +15,7 @@ from tqdm import tqdm
 from Source import Producers
 from Indexer import Indexers
 from truth_inference_checker import truth_inference_checkers
-from owner import owners
+from owner import set_farmers_insurance_owners
 
 # Oracles Master Dictionary
 Oracles = {}
@@ -165,6 +165,7 @@ if __name__ == "__main__":
     counter_indexers_malign = len(idx_malicious_indexers)
     counter_indexers_banned = 0
     counter_indexers_banned_malign = 0
+    owners = set_farmers_insurance_owners()
     for owner in owners:
         print(owner)
         for _ in range(owner.number_of_indexers):
@@ -207,22 +208,22 @@ if __name__ == "__main__":
             if constants._DEBUG_:
                 print(f"\n\n////// EPOCH {epoch} \\\\\\\\\\\\")
             if epoch == attack_epoch:
-                print(f" ATTACK EPOCH: {epoch}")
+                #print(f" ATTACK EPOCH: {epoch}")
                 counter_indexers_malign = use_case.turn_indexers(indexers=list(Indexers.values()))
-                print(f"Turned {counter_indexers_malign} indexers into malicious")
+                #print(f"Turned {counter_indexers_malign} indexers into malicious")
             if epoch == attack_epoch + constants.ATTACK_DURATION + 1:
-                print(f" ATTACK FINISHED: {epoch}")
+                #print(f" ATTACK FINISHED: {epoch}")
                 use_case.turn_indexers(indexers=list(Indexers.values()))
 
             if constants.MODE == Mode.DIORSGX:
                 diorsgx.do_DiorSGX(epoch, outfile, truth_checker)
                 continue
-
             elif constants.MODE == Mode.CHAINLINK:
-                # select random source
                 chainlink.do_chainlink(epoch, outfile, truth_checker)
                 continue
-
+            elif constants.MODE == Mode.MEDIAN:
+                mediana.do_median(epoch, outfile, truth_checker)
+                continue
             # Pick candidate Oracles for the next measurement [selected_oracles is the list of ids]
             if constants.ALGO == constants.ALGO_AVG:
                 weights = [1.0 for _o in Oracles]  # Algo average does not care about the weights nor the ranking
@@ -406,11 +407,6 @@ if __name__ == "__main__":
                 avg_reputation_benign=avg_reputation_benign,
                 avg_reputation_malign=avg_reputation_malign,
             )
-            if epoch >= attack_epoch and epoch <= attack_epoch + constants.ATTACK_DURATION:
-                print(f"inferred truth: {inferred_truth}")
-            if counter_sequential_fail >= constants.CONTRACT_READS:
-                print("FAILED!!!")
-                sys.exit(0)
 
     # EPOCH END
 
