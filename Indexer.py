@@ -22,8 +22,9 @@ indexer_incremental_idx = 1
 # GLOBAL DICTIONARY OF INDEXERS
 Indexers = {}
 
-# Factory method to create a new Indexer and add it to the Indexers
+# Factory
 def generateNewIndexer(trusted = True):
+    """ Factory method to generate a new Indexer and add it to the Indexers dictionary. """
     _indexer = Indexer(trusted)
     Indexers[_indexer.idx] = _indexer
     return _indexer.idx
@@ -40,6 +41,7 @@ class Indexer:
         self.trusted = trusted
         self.indexed_sources = []
         self.selected_producers = []
+        self.scores = []
         self.last_request = None
         self.reputation = INDEXER_REPUTATION_INIT
 
@@ -77,7 +79,7 @@ class Indexer:
         return selected
     
     # Average out the last score of the Sources that replied to the last request
-    def updateReputation(self):
+    def record_score(self):
         # Average the scores
         avg_score = 0.0
         scores = 0.0
@@ -88,8 +90,15 @@ class Indexer:
                 scores += 1
         avg_score = avg_score / scores
         
-        # Update the reputation
-        self.reputation = avg_score * ALPHA + self.reputation * (1.0 - ALPHA)
+        # Add to the scores
+        self.scores.append(avg_score)
+        
+
+    def update_reputation(self):
+        for score in self.scores:
+            self.reputation = score * ALPHA + self.reputation * (1.0 - ALPHA)
+        self.scores = []  # Reset scores after updating reputation
+
 
     def print_self(self, verbose=False):
         head = "Trusted" if self.trusted else "Unstrusted"

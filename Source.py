@@ -85,7 +85,8 @@ class Source:
         self.last_score_array = None
         self.last_deviation_array = None
         self.last_consistency_array = None
-        self.last_score = None
+        self.last_score = None # This is needed by the Indexer to calculate its own score
+        self.scores = []
         self.internal_reputation = SOURCE_REPUTATION_INIT
         return
 
@@ -109,7 +110,7 @@ class Source:
         return np.random.normal(self.avg_speed, SPEED_VARIANCE)
     
     # Update the last_score by calculating a new score using the lastGeneratedSample and the inferred truth
-    def updateScore(self, _inferred_truth):
+    def record_score(self, _inferred_truth):
         
         # How much values are distant from the GROUND TRUTH
         self.last_score_array = np.array([ # NaN values handled natively
@@ -129,10 +130,18 @@ class Source:
         # Calculate the rating using the new equation balanced by a parameter BETA.
         # INFO: Originally returning the minium (a.k.a. the best)
         # ----> self.last_score = np.min(self.last_score_array)
-        self.last_score = ( BETA_SOURCE * np.mean(self.last_score_array) )  + ( (1.0 - BETA_SOURCE) * np.mean(self.last_deviation_array))
+        self.last_score = (BETA_SOURCE * np.mean(self.last_score_array) )  + ( (1.0 - BETA_SOURCE) * np.mean(self.last_deviation_array))
+        
+        self.scores.append( self.last_score )  # Add the score to the scores list)
+    
+    def update_reputation(self):
+        
+         # Update the internal reputation, this may help the Indexer in selecting sources...
+        for _score in self.scores:
+            self.internal_reputation = _score * ALPHA_SOURCE + self.internal_reputation * (1 - ALPHA_SOURCE)
+        self.scores = []  # Reset scores after updating reputation
 
-        # Update the internal reputation, this may help the INdexer in selecting sources...
-        self.internal_reputation = self.last_score * ALPHA_SOURCE + self.internal_reputation * (1 - ALPHA_SOURCE)
+
 
     def print_self(self, verbose=False):
         head = "Trusted" if self.trusted else "Unstrusted"
