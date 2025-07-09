@@ -258,7 +258,7 @@ if __name__ == "__main__":
                         print(f"\n\n////// NEW REQUEST at epoch {next_event.timestamp} \\\\\\\\\\\\")
 
                     # Pick the best Blockchain to act as a relay
-                    relay_chain = Blockchain.selectRelayChain()
+                    relay_chain = Blockchain.selectRelayChain(next_event.timestamp)
                     if constants._DEBUG_:
                         print(f"Selected relay chain: {relay_chain.name} with {len(relay_chain.pending_transactions)} transactions.")
 
@@ -330,7 +330,7 @@ if __name__ == "__main__":
                     if abs(inferred_truth - Source.GROUND_TRUTH) > Source.TOLERANCE: # Check if the query result is compromised
                         counter_fail += 1
 
-                    # Construct the Delay Matrix for calcualting the Oracle delays (same shape as value matrix)
+                    # Construct the Delay Matrix for calculating the Oracle delays (same shape as value matrix)
                     delay_matrix = np.zeros_like(value_matrix) # first index is the source (row), second index is the oracle (column)
                     for row, _prod in enumerate(delay_matrix):
                         for col, _oracle in enumerate(_prod):
@@ -362,9 +362,12 @@ if __name__ == "__main__":
                             )
 
                     # Generate new Event for the result with the same id as the request 
-                    delay = relay_chain.calculate_delay()
-                    newEvent = Event(next_event.timestamp + delay, type = enums.EventType.Result, id = next_event.idx)
+                    #delay = relay_chain.calculate_delay()
+                    response_timestamp = relay_chain.compute_response_timestamp(next_event.timestamp)
+                    newEvent = Event(response_timestamp, type = enums.EventType.Result, id = next_event.idx)
                     EventTimelineManager.add_event(newEvent)
+                    if constants._DEBUG_:
+                        print(f"----> Response timestamp will be at: {newEvent.timestamp} for request {next_event.idx}.")
 
                     # Add the transaction to the relay chain
                     relay_chain.add_transaction(next_event.idx)
