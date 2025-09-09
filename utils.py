@@ -35,6 +35,19 @@ def generateProducersArrivalArray(size):
     Generates a list of producers' arrivals following a Uniform distribution in the second third of the timeline.
     - size: The number of producers to generate.
     """
-    arrivals = np.random.randint(int(constants.N_EPOCHS / 3.0), high=int(constants.N_EPOCHS / 3.0 * 2.0), size=size) 
+    arrivals = np.random.randint(int(constants.N_EPOCHS / 3.0), high=int(constants.N_EPOCHS / 3.0 * 2.0), size=size)
     arrivals.sort()  # Sort the arrivals to ensure they are in chronological order
     return arrivals.tolist()  # Convert to list for consistency with other functions
+
+def calculateObjectiveFunctionValue(cost, delay):
+    """
+    Calculates the objective function value based on cost and delay.
+    - cost: The cost incurred.
+    - delay: The delay experienced.
+    """
+    if isNull(cost) or isNull(delay):
+        return np.nan
+    
+    cost = (cost / constants.MAX_COST) if cost < constants.MAX_COST else 1.0
+    delay = (delay / constants.MAX_TIME) if delay < constants.MAX_TIME else 1.0
+    return 1 - (constants.COST_TIME_PARAM * cost + (1 - constants.COST_TIME_PARAM) * delay)

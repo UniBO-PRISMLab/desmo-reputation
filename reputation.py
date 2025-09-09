@@ -136,6 +136,9 @@ if __name__ == "__main__":
     args = parse_args()
     apply_arguments_to_constants(args)
 
+    ## Time of the day, used only for the blcokchain fees
+    time_of_the_day = random.randint(0, 86400 - constants.N_EPOCHS)  # Random time of the day in seconds (0-86400)
+
     ### Check if we are compromised (i.e. Malicious Oracles and Indexers are taking up MORE than 50% of the value matrix)
     malicious_power = constants.RATIO_MALICIOUS_INDEXERS + constants.RATIO_MALICIOUS_ORACLES - constants.RATIO_MALICIOUS_ORACLES * constants.RATIO_MALICIOUS_INDEXERS
     if malicious_power > 0.5 and constants.SKIP_COMPROMISED:
@@ -258,7 +261,7 @@ if __name__ == "__main__":
                         print(f"\n\n////// NEW REQUEST at epoch {next_event.timestamp} \\\\\\\\\\\\")
 
                     # Pick the best Blockchain to act as a relay
-                    relay_chain = Blockchain.selectRelayChain(next_event.timestamp)
+                    relay_chain = Blockchain.selectRelayChain(next_event.timestamp + time_of_the_day)
                     if constants._DEBUG_:
                         print(f"Selected relay chain: {relay_chain.name} with {len(relay_chain.pending_transactions)} transactions.")
 
@@ -303,19 +306,20 @@ if __name__ == "__main__":
                     sources_trusted_idx = [] # This is needed to calculate the truth inference
                     sources_trusted_indexers_rep = [] # Along with the indexers reputation
                     for _i_idx, _i in enumerate(sources_idx):
-                        Producers[_i].generateSample(request = next_event.idx, n_samples = len(selected_oracles))
+                        Producers[_i].generateSample(request = next_event.idx, n_samples = len(selected_oracles), attack = next_event.timestamp >= constants.COLLUSION_TIME)
                         # Pick candidates indices for which there is no null value
                         if all(not utils.isNull(_val) for _val in Producers[_i].lastGeneratedSample) or (constants.ALGO == constants.ALGO_AVG):
                             sources_trusted_idx.append(_i)
                             sources_trusted_indexers_rep.append(sources_indexers_rep[_i_idx])
 
                     # Make malicious Oracles tamper the values
-                    for _select_o, _o in enumerate(selected_oracles):
-                        if not Oracles[_o].trusted:
-                            for _i in sources_idx:
-                                if Producers[_i].trusted: # We do not touch untrusted sources
-                                    # We just project our value to the false truth
-                                    Producers[_i].lastGeneratedSample[_select_o] -= (Source.GROUND_TRUTH - Source.FALSE_TRUTH)
+                    if next_event.timestamp >= constants.COLLUSION_TIME: # If we are in the collusion time, we need to tamper the values
+                        for _select_o, _o in enumerate(selected_oracles):
+                            if not Oracles[_o].trusted:
+                                for _i in sources_idx:
+                                    if Producers[_i].trusted: # We do not touch untrusted sources
+                                        # We just project our value to the false truth
+                                        Producers[_i].lastGeneratedSample[_select_o] -= (Source.GROUND_TRUTH - Source.FALSE_TRUTH)
 
 
                     # Pick the best value [TRUTH INFERENCE] excluding the defective ones
@@ -326,9 +330,10 @@ if __name__ == "__main__":
                         inferred_truth = np.inf # if everyone gave a nan response
                     if constants._DEBUG_:
                         print(f"----> INFERRED TRUTH: {inferred_truth}")
-                    counter_tot += 1
-                    if abs(inferred_truth - Source.GROUND_TRUTH) > Source.TOLERANCE: # Check if the query result is compromised
-                        counter_fail += 1
+                    if next_event.timestamp >= constants.COLLUSION_TIME: # If we are in the collusion time, we need to check if the inferred truth is compromised
+                        counter_tot += 1
+                        if abs(inferred_truth - Source.GROUND_TRUTH) > Source.TOLERANCE: # Check if the query result is compromised
+                            counter_fail += 1
 
                     # Construct the Delay Matrix for calculating the Oracle delays (same shape as value matrix)
                     delay_matrix = np.zeros_like(value_matrix) # first index is the source (row), second index is the oracle (column)
@@ -361,9 +366,22 @@ if __name__ == "__main__":
                                 time_threshold
                             )
 
-                    # Generate new Event for the result with the same id as the request 
-                    #delay = relay_chain.calculate_delay()
-                    response_timestamp = relay_chain.compute_response_timestamp(next_event.timestamp)
+                    # Calculate timestamp of the response with the selected chain (and, cosequently, the cost and the delay)
+                    response_timestamp, actual_cost = relay_chain.compute_response_timestamp_and_cost(next_event.timestamp + time_of_the_day)
+                    if constants.FAV_CHAIN == -1: # Sequential (IDEAL)
+                        response_timestamp = next_event.timestamp
+                    actual_delay = response_timestamp - next_event.timestamp - time_of_the_day
+                    actual_objective = utils.calculateObjectiveFunctionValue(actual_cost, actual_delay)
+
+                    # Calculate timestamp of the response with the optimal chain (and, cosequently, the optimal cost and the delay, given the tradeoff parameter)
+                    optimal_response_timestamp, optimal_cost = Blockchain.compute_optimal_response_timestamp_and_cost(next_event.timestamp + time_of_the_day)
+                    if constants.FAV_CHAIN == -1: # Sequential (IDEAL)
+                        optimal_response_timestamp = next_event.timestamp
+                    optimal_delay = optimal_response_timestamp - next_event.timestamp - time_of_the_day
+                    optimal_objective = utils.calculateObjectiveFunctionValue(optimal_cost, optimal_delay)
+
+
+                    # Generate new Event for the result with the same id as the request and and the computed delay
                     newEvent = Event(response_timestamp, type = enums.EventType.Result, id = next_event.idx)
                     EventTimelineManager.add_event(newEvent)
                     if constants._DEBUG_:
@@ -374,6 +392,28 @@ if __name__ == "__main__":
                 
                     # Purge the temporary lists - to ensure they are not used in the next iteration
                     del candidates_indices, sources_idx, sources_trusted_idx
+
+                    # Report onto the file
+                    avg_reputation_benign = ( float(sum([x.reputation for x in (list(Indexers.values()) + Banlist) if x.trusted])) / float(counter_indexers_created - counter_indexers_malign) ) if counter_indexers_created else 0.0
+                    avg_reputation_malign = ( float(sum([x.reputation for x in (list(Indexers.values()) + Banlist) if not x.trusted])) / float(counter_indexers_malign) ) if counter_indexers_malign else 0.0
+                    outfile.write(
+                        ",".join([
+                            str(next_event.timestamp),                      # TIME
+                            str(counter_indexers_created),                  # NUMBER OF INDEXERS (active or banned)
+                            str(counter_indexers_malign),                   # NUMBER OF MALIGN INDEXERS (active or banned)
+                            str(counter_indexers_banned),                   # NUMBER OF INDEXERS (banned)
+                            str(counter_indexers_banned_malign),            # NUMBER OF MALIGN INDEXERS (banned)
+                            str(inferred_truth),                            # CONSENSUS ACHIEVED
+                            str(avg_reputation_benign),                     # AVERAGE REPUTATION OF BENIGN SOURCES
+                            str(avg_reputation_malign),                     # AVERAGE REPUTATION OF MALIGN SOURCES
+                            str(next_event.type),                           # EVENT TYPE
+                            str(actual_delay),                              # ACTUAL DELAY
+                            str(actual_cost),                               # ACTUAL COST
+                            str(relay_chain.name),                          # RELAY CHAIN NAME
+                            str(actual_objective),                          # ACTUAL OBJECTIVE
+                            str(optimal_objective),                         # OPTIMAL OBJECTIVE
+                        ]) + "\n"
+                    )
 
                 ###### RESULT HANDLING ######
                 case enums.EventType.Result:
@@ -408,7 +448,6 @@ if __name__ == "__main__":
                     
                     # Print the ranking
                     if constants._DEBUG_:
-                        # printRanking(header="<<<<<< Ranking After Reputation Update >>>>>>", verbose=False, candidates_idx=candidates_indices) # XXX no candidates_indices here
                         printRanking(header="<<<<<< Ranking After Reputation Update >>>>>>", verbose=False)
                         printRanking(header="Banlist:", banned=True)
                         printOracles(header="Oracles:") 
@@ -419,43 +458,17 @@ if __name__ == "__main__":
 
             
             #================================#
-        
-            # Report onto the file
-
-            avg_reputation_benign = ( float(sum([x.reputation for x in (list(Indexers.values()) + Banlist) if x.trusted])) / float(counter_indexers_created - counter_indexers_malign) ) if counter_indexers_created else 0.0
-            avg_reputation_malign = ( float(sum([x.reputation for x in (list(Indexers.values()) + Banlist) if not x.trusted])) / float(counter_indexers_malign) ) if counter_indexers_malign else 0.0
-            outfile.write(
-                ",".join([
-                    str(next_event.timestamp),                                     # TIME
-                    str(counter_indexers_created),                  # NUMBER OF INDEXERS (active or banned)
-                    str(counter_indexers_malign),                   # NUMBER OF MALIGN INDEXERS (active or banned)
-                    str(counter_indexers_banned),                   # NUMBER OF INDEXERS (banned)
-                    str(counter_indexers_banned_malign),            # NUMBER OF MALIGN INDEXERS (banned)
-                    str(inferred_truth),                            # CONSENSUS ACHIEVED
-                    str(avg_reputation_benign),                     # AVERAGE REPUTATION OF BENIGN SOURCES
-                    str(avg_reputation_malign)                      # AVERAGE REPUTATION OF MALIGN SOURCES
-                ]) + "\n"
-            )
-            
-    # EPOCH END
+               
+        # EVENT MANAGEMENT END
     
-    if constants._DEBUG_ and False:
-        printProducers(Producers, verbose=True, header="Ranking: ")
-        printOracles(Oracles, verbose=True, header="Oracles: ")
-        printProducers(Banlist, verbose=True, header="Banlist: ") # Use a different function
-    
-    printRanking(header="<<<<<< Final Ranking >>>>>>", verbose=False)
+    if constants._DEBUG_:
+        printRanking(header="<<<<<< Final Ranking >>>>>>", verbose=False)
 
-    # print(counter_indexers_banned_malign, counter_indexers_banned, counter_indexers_malign)
-    print("Precision: {}".format( (counter_indexers_banned_malign / counter_indexers_banned) if counter_indexers_banned else 0 ))
-    print("Recall {}".format( (counter_indexers_banned_malign / counter_indexers_malign) if counter_indexers_banned else 0 ))
-    print("Ground Truth Accuracy {}".format(1.0 - float(counter_fail) / float(counter_tot)))
-
-    # printReputationToFile(Indexers, "repIndexers.csv")
-    # printReputationToFile(Oracles, "repOracles.csv")
-
-    # except Exception as e:
-    #     print (e)
-    #     os.remove(FILE_OUT)     
+    print(
+        "Precision: {}".format( round( (counter_indexers_banned_malign / counter_indexers_banned) if counter_indexers_banned else 0), 3),
+        "Recall {}".format( round( (counter_indexers_banned_malign / counter_indexers_malign) if counter_indexers_banned else 0, 3) ),
+        # "Truth Accuracy {}".format( round(1.0 - float(counter_fail) / float(counter_tot), 3)),
+        "Truth Accuracy after Attack {}".format( round(1.0 - float(counter_fail) / float(counter_tot), 3))
+    )
 
 

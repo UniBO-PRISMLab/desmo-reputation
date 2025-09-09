@@ -91,9 +91,9 @@ class Source:
         return
 
     # Generate a number of data samples around the ground truth
-    def generateSample(self, request=None, n_samples=N_SAMPLES, beta=BETA_SOURCE):
+    def generateSample(self, request=None, n_samples=N_SAMPLES, beta=BETA_SOURCE, attack=False):
         self.last_request = request
-        if self.trusted:
+        if self.trusted or not attack: # If the source is trusted or the attack has not been triggered
             self.lastGeneratedSample = np.random.normal(loc=GROUND_TRUTH, scale=self.variance, size=n_samples)
         else:
             self.lastGeneratedSample = np.random.normal(loc=FALSE_TRUTH, scale=self.variance, size=n_samples)
