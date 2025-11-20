@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime  # tzinfo, timezone
+from datetime import datetime, timedelta  # tzinfo, timezone
 import os
 import random
 from typing import Dict, Set, Optional, Any, List
@@ -15,29 +15,33 @@ source_incremental_idx: int = 1
 
 # --- Trace File Management ---
 _available_trace_files: Optional[List[str]] = None
+_available_trace_files_virtual: Optional[List[str]] = None
 _assigned_trace_files: Set[str] = set()
 
 
 def _initialize_available_traces() -> None:
     """
-    Scans the TRACES_PATH for CSV files starting with 'WS' and populates
+    Scans the TRACES_PATH for CSV files starting with 'NWS' and populates
     the _available_trace_files list. This function is called lazily.
     Files are shuffled to ensure randomness when picking.
     """
-    global _available_trace_files
+    global _available_trace_files, _available_trace_files_virtual
     if _available_trace_files is not None:  # Ensure it runs only once
         return
 
     _available_trace_files = []
+    _available_trace_files_virtual = []
     # Use TRACES_PATH from constants, with a fallback default
     if not os.path.exists(constants.TRACES_PATH) or not os.path.isdir(constants.TRACES_PATH):
         print(f"Warning: Traces directory '{constants.TRACES_PATH}' not found or is not a directory.")
         return  # _available_trace_files remains an empty list
 
     for filename in os.listdir(constants.TRACES_PATH):
-        if filename.startswith("WS") and filename.endswith(".csv"):
+        if filename.startswith(constants.FILE_PREFIX) and filename.endswith(".csv"):
             _available_trace_files.append(os.path.join(constants.TRACES_PATH, filename))
-
+        if filename.startswith("MERGED"):
+            #print(os.path.join(constants.TRACES_PATH, filename))
+            _available_trace_files_virtual.append(os.path.join(constants.TRACES_PATH, filename))
     random.shuffle(_available_trace_files)  # Shuffle for random assignment
 
 
@@ -52,15 +56,21 @@ def _get_random_trace_file() -> str:
     Raises:
         RuntimeError: If no unassigned trace files are available.
     """
-    global _available_trace_files, _assigned_trace_files
+    global _available_trace_files, _available_trace_files_virtual, _assigned_trace_files
 
     if _available_trace_files is None:
         _initialize_available_traces()
 
-    if not _available_trace_files:  # True if None or empty list after initialization attempt
+    if (
+        not _available_trace_files and not _available_trace_files_virtual
+    ):  # True if None or empty list after initialization attempt
         raise RuntimeError("No more trace files available for new Source instances.")
 
-    file_path: str = _available_trace_files.pop()
+    if len(_available_trace_files) > 0:
+        file_path: str = _available_trace_files.pop()
+    else:
+        file_path: str = _available_trace_files_virtual.pop()
+
     _assigned_trace_files.add(file_path)
     return file_path
 
@@ -110,10 +120,11 @@ class Source:
         # self.defective: bool = (getattr(constants, 'SOURCE_DEFECTIVE', False) and
         #                         np.random.rand() < getattr(constants, 'SOURCE_RATIO_DEFECTIVE', 0.1))
         self.defective: bool = False  # Defaulting to non-defective for trace reading
-
         try:
             self.trace_file_path: str = _get_random_trace_file()
+            self.is_virtual =  self.trace_file_path.startswith("MERGED")                
             self.data: pd.DataFrame = self._load_trace_data()
+            
         except RuntimeError:  # Specifically "No more trace files"
             source_incremental_idx -= 1  # Roll back ID increment
             raise
@@ -126,7 +137,7 @@ class Source:
         self.avg_speed: float = constants.SOURCE_BASE_SPEED
 
         self.last_generated_sample: Optional[Any] = None
-        self.last_request: Optional[Dict[str, Any]] = None
+        self.last_request_at: Optional[Dict[str, Any]] = None
 
         # Scoring attributes - their calculation will change as last_generated_sample is a single value.
         self.last_score_array: Optional[np.ndarray] = None
@@ -158,13 +169,13 @@ class Source:
         try:
             # Time format example: 2025-03-27T14:38:47.170851094Z
             # '%Y-%m-%dT%H:%M:%S.%f%z' handles Zulu (UTC) suffix and fractional seconds.
+            print(df["time"])
             df["time"] = pd.to_datetime(df["time"], format="%Y-%m-%dT%H:%M:%S.%f%z", errors="coerce")
         except Exception as e:
             raise ValueError(
                 f"Error parsing 'time' column in {self.trace_file_path}. "
                 f"Ensure format is like 'YYYY-MM-DDTHH:MM:SS.fffffffffZ'. Error: {e}"
             )
-
         df.dropna(subset=["time"], inplace=True)  # Remove rows where time conversion failed
         if df.empty:
             raise ValueError(f"No valid time entries found in {self.trace_file_path} after parsing.")
@@ -183,56 +194,46 @@ class Source:
         # If 'trusted' status should influence other parameters for trace-based sources,
         # that logic would go here.
 
-    def generate_sample(self, data_type: str, timestamp: datetime) -> Optional[Any]:
-        """
-        Retrieves/generates a data sample.
-        If `self.trusted` is True, reads from the trace file.
-        If `self.trusted` is False, generates a synthetic sample.
-
-        Args:
-            data_type (str): The column name (e.g., 'temperature') for trace reading.
-                             Ignored if generating synthetic data.
-            timestamp (datetime): The query timestamp for trace reading.
-                                  Ignored if generating synthetic data.
-
-        Returns:
-            Optional[Any]: The data value, or None.
-        """
-        self.last_request = {"data_type": data_type, "timestamp": timestamp, "trusted_at_request": self.trusted}
-
+    def generate_sample(
+        self,
+        current_time: datetime,
+        data_type: str = "temperature",
+        n_samples: int = 1,
+        variance: float = 0.01,
+        max_data_staleness_in_sec: int = constants.MAX_DATA_STALENESS_IN_SEC,  # New parameter
+    ) -> Optional[List[float]]:
+        self.last_request_at = current_time
         if self.trusted:
             if self.data is None or self.trace_file_path is None:
-                print(f"Warning: Source {self.idx} is trusted but has no trace data loaded. Cannot provide sample.")
+                print(f"Warning: Source {self.idx} is trusted but has no trace data loaded.")
                 self.last_generated_sample = None
                 return None
 
-            if not isinstance(data_type, str):
+            if not isinstance(data_type, str) or data_type not in self.data.columns:
                 self.last_generated_sample = None
                 return None
 
-            if data_type not in self.data.columns:
-                self.last_generated_sample = None
-                return None
-
-            # Timezone handling for timestamp comparison (assuming trace times are UTC)
-            # if timestamp.tzinfo is None:
-            #     print(f"Warning: Input timestamp for Source {self.idx} is naive. Assuming UTC for comparison.")
-            #     timestamp = timestamp.replace(tzinfo=timezone.utc) # Or handle as error
-
-            idx_after = self.data["time"].searchsorted(timestamp, side="right")
-
+            idx_after = self.data["time"].searchsorted(current_time, side="right")
             if idx_after == 0:
                 self.last_generated_sample = None
                 return None
 
-            last_data_point_series = self.data.iloc[idx_after - 1]
-            value = last_data_point_series[data_type]
+            value = self.data.iloc[idx_after - 1][data_type]
+            value_timestamp = self.data.iloc[idx_after - 1]["time"]
+            # print(f"time delay:{current_time.timestamp() - value_timestamp.timestamp()}")
+            if current_time.timestamp() - value_timestamp.timestamp() >= (max_data_staleness_in_sec):
+                self.last_generated_sample = [None for i in range(n_samples)]
+                return self.last_generated_sample
 
-            self.last_generated_sample = None if pd.isna(value) else value
-            return self.last_generated_sample
-
+            base = float(value)
+            variation_range = variance * base
+            samples = np.random.uniform(base - variation_range, base + variation_range, size=n_samples).tolist()
+            self.last_generated_sample = samples
         else:
-            return np.random.normal(loc=constants.FALSE_TRUTH, scale=self.attacker_variance)
+            samples = np.random.normal(loc=constants.FALSE_TRUTH, scale=self.attacker_variance, size=n_samples)
+            self.last_generated_sample = samples
+
+        return self.last_generated_sample
 
     def generate_delay(self) -> float:
         """Generates a simulated processing or network delay."""
@@ -241,25 +242,29 @@ class Source:
     def update_score(self, _inferred_truth):
         # How much values are distant from the GROUND TRUTH
         self.last_score_array = np.array(
-            [  # NaN values handled natively
-                utils.constraintFunction(_x, constants.TOLERANCE)
-                for _x in np.absolute(self.lastGeneratedSample - _inferred_truth)
-            ] 
-        )
-
-        # How much values are distant from the LOCAL MEAN
-        self.last_deviation_array = np.array(
-            [  # NaN values handled natively
-                utils.constraintFunction(_x, constants.TOLERANCE)
-                for _x in np.absolute(self.lastGeneratedSample - np.mean(self.lastGeneratedSample))
+            [
+                utils.constraintFunction(abs(x - _inferred_truth), constants.TOLERANCE)
+                if x is not None
+                else utils.constraintFunction(x or 0, constants.TOLERANCE)
+                for x in self.last_generated_sample
             ]
         )
-
-        # How much values are distant from the LOCAL MEAN but compared with other Oracles [THIS IS FOR ORACLES!]
+        valid_samples = [x for x in self.last_generated_sample if x is not None]
+        mean = np.mean(valid_samples)
+        # How much values are distant from the LOCAL MEAN
+        self.last_deviation_array = np.array(
+            [
+                utils.constraintFunction(abs(x - mean), constants.TOLERANCE)
+                if x is not None
+                else utils.constraintFunction(0.0, constants.TOLERANCE)
+                for x in self.last_generated_sample
+            ]
+        )
+        std = np.std([x - mean for x in valid_samples]) if valid_samples else 1e-6  # avoid division by 0
         self.last_consistency_array = np.array(
-            [  # NaN values handled natively
-                utils.constraintFunction(_x, np.std(self.lastGeneratedSample - np.mean(self.lastGeneratedSample)))
-                for _x in np.absolute(self.lastGeneratedSample - np.mean(self.lastGeneratedSample))
+            [
+                utils.constraintFunction(abs(x - mean), std) if x is not None else utils.constraintFunction(0.0, std)
+                for x in self.last_generated_sample
             ]
         )
 
@@ -295,7 +300,7 @@ class Source:
 
             print(
                 f"{base_info}"
-                f"\n\t Last Request: {self.last_request}"
+                f"\n\t Last Request: {self.last_request_at}"
                 f"\n\t Last Sample Value: {self.last_generated_sample}"
                 f"\n\t Last Score (vs inferred truth, component): {score_array_str}"
                 f"\n\t Last Overall Rating: {self.last_score:.4f if self.last_score is not None else 'N/A'}"

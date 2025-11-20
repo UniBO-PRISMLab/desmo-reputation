@@ -1,6 +1,8 @@
+from datetime import datetime
 import random
 import sys
 import numpy as np
+import pandas as pd
 import Indexer
 import Source
 import Oracle
@@ -33,26 +35,13 @@ truth_checker = truth_inference_checkers[constants.TRUTH_INFERENCE]
 
 
 # Create new producer, add it to the global list and register it to a random number of indexers
-def createNewProducer(trusted=True, owner=0):
-    _prod_idx = Source.generateNewProducer(trusted=trusted)
-
-    interesting_indexers = []  # Let us list only the indexers I want to be enrolled in
-    if (
-        constants.RATIO_MALICIOUS_INDEXERS > 0 and constants.VERTICAL_ATTACK
-    ):  # If I am good, then we only select good indexers and vice versa
-        interesting_indexers = [i for i in list(Indexers.keys()) if (Indexers[i].trusted == trusted)]
-    if len(interesting_indexers) == 0:  # Let us distribute into every indexer
-        interesting_indexers = [indexer_key for indexer_key in Indexers if Indexers[indexer_key].owner == owner]
-
-    # Long Tail pareto distribution
-    # _n_indexers = np.random.randint(1, len(interesting_indexers)) # Register to random number of Indexers
-    _n_indexers = min(round(random.paretovariate(alpha=2)), len(interesting_indexers))
-    if not _n_indexers > 0:
-        print(len(Indexers), " DAMMIT")
-    assert _n_indexers > 0
-
-    for _indexer in np.random.choice(interesting_indexers, _n_indexers, replace=False):  # And pick them randomly
-        Indexers[_indexer].register(_prod_idx)
+def create_new_producer(trusted=True, owner=0):
+    _prod_idx = Source.generate_new_producer(trusted=trusted)
+    available_indexers = [i for i in list(Indexers.keys()) if (len(Indexers[i].indexed_sources) == 0)]
+    if len(available_indexers) == 0:
+        raise ValueError("No indexers are available")
+    chosen_indexer_id = random.choice(available_indexers)
+    Indexers[chosen_indexer_id].register(_prod_idx)
 
 
 def printProducers(_ranking, verbose=False, header="", sources_idx=[]):
@@ -104,7 +93,7 @@ def runTruthInference(value_matrix, reputation_array, algo=constants.TRUTH_MED):
         n_rows, n_cols = value_matrix.shape
         # extend the reputation array to match the value matrix
         reputation_matrix = np.transpose(np.tile([float(_r) for _r in reputation_array], (n_cols, 1)))
-        reputation_matrix += 1 # Make everything positive
+        reputation_matrix += 1  # Make everything positive
         # Normalize the reputation matrix
         reputation_matrix /= np.sum(reputation_matrix)
         # Flatten the value matrix and the reputation matrix
@@ -140,41 +129,7 @@ if __name__ == "__main__":
     apply_arguments_to_constants(args)
 
     # Number of sources present at cold start and its dual
-    S_0 = int(constants.S * constants.RATIO_COLD_START)
-    S_remainder = constants.S - S_0
-
-    # @IVAN This shuck of code regulates the arrival rate of the second half of sources over the simulation
-    # Array of arrival and of malicious
-    arrivals = np.random.randint(
-        int(constants.N_EPOCHS / 3.0), high=int(constants.N_EPOCHS / 3.0 * 2.0), size=S_remainder
-    )  # FIXME magic numbers
-    arrivals.sort()
-    arrivals_malicious = np.zeros(S_remainder)
-    # Put ones where malicious are
-    if constants.ARRIVAL_RATE == "uniform":
-        # pick a sample of them with respect to RATIO_MALICIOUS
-        for _idx in np.random.choice(
-            np.arange(S_remainder), int(constants.RATIO_MALICIOUS_SOURCES * S_remainder), replace=False
-        ):
-            arrivals_malicious[_idx] = 1.0
-    elif constants.ARRIVAL_RATE == "bursty":
-        # pick one epoch where the burst takes place and force the next malicious one to happen all at once
-        # _burst = np.random.randint(S_remainder - int(RATIO_MALICIOUS_SOURCES * S_remainder) + 1) # XXX OLD BURST happening at the beginning
-        _burst = np.random.randint(int(constants.N_EPOCHS / 3.0)) + int(constants.N_EPOCHS / 3.0)
-        for _idx in np.random.choice(
-            np.arange(S_remainder), int(constants.RATIO_MALICIOUS_SOURCES * S_remainder), replace=False
-        ):
-            arrivals[_idx] = _burst
-        arrivals.sort()
-        arrivals_malicious = [1.0 if x == _burst else 0.0 for x in arrivals]
-
-        # for _idx_mal in range(int(RATIO_MALICIOUS_SOURCES * S_remainder)):
-        #     arrivals_malicious[_burst + _idx_mal] = 1.0
-        #     arrivals[_burst + _idx_mal] = arrivals[_burst]
-    else:
-        sys.exit(0)
-
-    # Fill up the dict of Oracles
+    S_0 = int(constants.NUMBER_OF_SOURCES * constants.RATIO_COLD_START)
     idx_malicious_oracles = np.random.choice(
         np.arange(constants.O), int(constants.RATIO_MALICIOUS_ORACLES * constants.O), replace=False
     )
@@ -182,43 +137,36 @@ if __name__ == "__main__":
         _oracle = Oracle.Oracle(trusted=(_o not in idx_malicious_oracles))
         Oracles[_oracle.idx] = _oracle
 
-    # Fill up the list of indexers
-    idx_malicious_indexers = np.random.choice(
-        np.arange(constants.I), int(constants.RATIO_MALICIOUS_INDEXERS * constants.I), replace=False
-    )
-    counter_indexers_created = constants.I
-    counter_indexers_malign = len(idx_malicious_indexers)
+    counter_indexers_created = constants.NUMBER_OF_SOURCES
     counter_indexers_banned = 0
     counter_indexers_banned_malign = 0
-    owners = set_farmers_insurance_owners()
-    for owner in owners:
-        print(owner)
-        for _ in range(owner.number_of_indexers):
-            Indexer.generateNewIndexer(trusted=True, owner=owner.identifier)
-        for _ in range(owner.number_of_producers):
-            createNewProducer(owner=owner.identifier)
-
-    # for _i in range(constants.I):
-    #        Indexer.generateNewIndexer(trusted=(_i not in idx_malicious_indexers))
-
-    # @IVAN Create the first batch of sources some of them are malicious?
-    # Fill up the dict of sources and assign each of them to indexers
-    # for _ in range(S_0):
-    #    createNewProducer()
+    # owners = set_farmers_insurance_owners()
+    # for owner in owners:
+    # print(owner)
+    for _ in range(constants.NUMBER_OF_SOURCES):
+        Indexer.generateNewIndexer()
+    for _ in range(constants.NUMBER_OF_SOURCES):
+        create_new_producer()
 
     counter_sources = S_0
     counter_malign = 0
     counter_banned_sources = 0
     counter_banned_malign = 0
-
-    # NUmber of times the inferred truth is far from the reality
+    counter_indexers_malign = 0
+    # Number of times the inferred truth is far from the reality
     counter_fail = 0
     counter_tot = 0
     counter_sequential_fail = 0
-
+    # TODO: set start timestamp
+    start_time = datetime.fromisoformat("2025-06-05 18:35:20.880579409+00:00")#utils.get_random_query_start_timestamp()
+    current_time = utils.get_next_request_timestamp(start_time)
     print("Algorithm: " + constants.ALGO_LIST[constants.ALGO])
-
-    attack_epoch = use_case.define_start_attack_epoch()
+    print(f"Starting at: {start_time}...")
+    attack_time = utils.define_start_attack_timestamp(start_time)
+    stop_attack_time = attack_time + pd.Timedelta(seconds=constants.ATTACK_DURATION_IN_SEC)
+    attack_started = False
+    attack_finished = False
+    max_timestamp = utils.GLOBAL_MAX
 
     for indexer in Indexers.values():
         if not indexer.trusted:
@@ -229,25 +177,30 @@ if __name__ == "__main__":
     # EPOCH START
     with open(constants.FILE_OUT, "w") as outfile:
         fail_counter = 0
-        for epoch in tqdm(range(constants.N_EPOCHS)):
+        while current_time < max_timestamp:
             if constants._DEBUG_:
-                print(f"\n\n////// EPOCH {epoch} \\\\\\\\\\\\")
-            if epoch == attack_epoch:
-                #print(f" ATTACK EPOCH: {epoch}")
+                print(f"\n\n////// CURRENT TIME {current_time} \\\\\\\\\\\\")
+            if current_time > attack_time and not attack_started:
+                print(f" ATTACK TIME: from {current_time} to {stop_attack_time}")
                 counter_indexers_malign = use_case.turn_indexers(indexers=list(Indexers.values()))
-                #print(f"Turned {counter_indexers_malign} indexers into malicious")
-            if epoch == attack_epoch + constants.ATTACK_DURATION + 1:
-                #print(f" ATTACK FINISHED: {epoch}")
-                use_case.turn_indexers(indexers=list(Indexers.values()))
+                attack_started = True
+                # print(f"Turned {counter_indexers_malign} indexers into malicious")
+            if current_time > stop_attack_time and not attack_finished:
+                print(f" ATTACK FINISHED: {current_time}")
+                use_case.turn_indexers_good(indexers=list(Indexers.values()))
+                attack_finished = True
 
             if constants.MODE == Mode.DIORSGX:
-                diorsgx.do_DiorSGX(epoch, outfile, truth_checker)
+                diorsgx.do_DiorSGX(current_time, outfile, truth_checker)
+                current_time = utils.get_next_request_timestamp(current_time)
                 continue
             elif constants.MODE == Mode.CHAINLINK:
-                chainlink.do_chainlink(epoch, outfile, truth_checker)
+                chainlink.do_chainlink(current_time, outfile, truth_checker)
+                current_time = utils.get_next_request_timestamp(current_time)
                 continue
             elif constants.MODE == Mode.MEDIAN:
-                mediana.do_median(epoch, outfile, truth_checker)
+                mediana.do_median(current_time, outfile, truth_checker)
+                current_time = utils.get_next_request_timestamp(current_time)
                 continue
             # Pick candidate Oracles for the next measurement [selected_oracles is the list of ids]
             if constants.ALGO == constants.ALGO_AVG:
@@ -279,7 +232,9 @@ if __name__ == "__main__":
                 # This happens if I kicked out so many indexers that I need to take them all
                 candidates_indices = indices
             for _i in candidates_indices:
-                Indexers[_i].acceptRequest(epoch)  # Record the acceptance of the request for each selected indexer
+                Indexers[_i].acceptRequest(
+                    current_time
+                )  # Record the acceptance of the request for each selected indexer
 
             # Select the Producers to query
             assert len(candidates_indices) <= constants.S_req
@@ -287,7 +242,7 @@ if __name__ == "__main__":
             sources_indexers_rep = []  # Array of reputation of the indexers respective to the source above
             for _i in candidates_indices:  # Add producers to the list of selectd ones without duplicates
                 _selected_producers_for_indexer = [
-                    x for x in Indexers[_i].selectProducers(epoch) if x not in sources_idx
+                    x for x in Indexers[_i].select_producers(current_time) if x not in sources_idx
                 ]
                 sources_idx.extend(
                     _selected_producers_for_indexer
@@ -301,9 +256,10 @@ if __name__ == "__main__":
             sources_trusted_idx = []  # This is needed to calculate the truth inference
             sources_trusted_indexers_rep = []  # Along with the indexers reputation
             for _i_idx, _i in enumerate(sources_idx):
-                Producers[_i].generateSample(request=epoch, n_samples=len(selected_oracles))
+                samples = Producers[_i].generate_sample(current_time=current_time, n_samples=len(selected_oracles))
+                print(f"[{current_time}] ID: [{Producers[_i].idx}] {Producers[_i].trace_file_path} - {samples} ")
                 # Pick candidates indices for which there is no null value
-                if all(not utils.isNull(_val) for _val in Producers[_i].lastGeneratedSample) or (
+                if all(not utils.isNull(_val) for _val in Producers[_i].last_generated_sample) or (
                     constants.ALGO == constants.ALGO_AVG
                 ):
                     sources_trusted_idx.append(_i)
@@ -315,13 +271,13 @@ if __name__ == "__main__":
                     for _i in sources_idx:
                         if Producers[_i].trusted:  # We do not touch untrusted sources
                             # We just project our value to the false truth
-                            Producers[_i].lastGeneratedSample[_select_o] -= (
+                            Producers[_i].last_generated_sample[_select_o] -= (
                                 constants.GROUND_TRUTH - constants.FALSE_TRUTH
                             )
 
             # Pick the best value [TRUTH INFERENCE] excluding the defective ones
             if len(sources_trusted_idx) > 0:
-                value_matrix = np.array([Producers[_i].lastGeneratedSample for _i in sources_trusted_idx])
+                value_matrix = np.array([Producers[_i].last_generated_sample for _i in sources_trusted_idx])
                 inferred_truth = runTruthInference(value_matrix, sources_trusted_indexers_rep, algo=constants.TRUTH)
                 # if epoch >= attack_epoch and epoch <= attack_epoch + constants.ATTACK_DURATION:
                 #     print(value_matrix)
@@ -344,7 +300,7 @@ if __name__ == "__main__":
                 for col, _oracle in enumerate(_prod):
                     del_o = Oracles[selected_oracles[col]].generateDelay()
                     del_p = (
-                        Producers[sources_trusted_idx[row]].generateDelay() if len(sources_trusted_idx) > 0 else 100.0
+                        Producers[sources_trusted_idx[row]].generate_delay() if len(sources_trusted_idx) > 0 else 100.0
                     )  # A very high number because it means that there are no producers
                     delay_matrix[row][col] = del_o + del_p
             delay_array = np.sum(delay_matrix, axis=0)
@@ -354,11 +310,29 @@ if __name__ == "__main__":
 
             # Generate a score for each selected producer and update the reputation
             for _i in sources_idx:
-                Producers[_i].updateScore(inferred_truth)
+                Producers[_i].update_score(inferred_truth)
 
             # Update reputation of Indexers
             for _i in candidates_indices:
                 Indexers[_i].updateReputation()
+            valid_indexers = [
+                indexer for indexer in Indexers.values() if not Producers[indexer.indexed_sources[0]].is_virtual
+            ]
+            for indexer in valid_indexers:
+                print(Producers[indexer.indexed_sources[0]].last_generated_sample)
+                
+            data_of_indexers = [
+                np.mean(Producers[indexer.indexed_sources[0]].last_generated_sample)
+                if Producers[indexer.indexed_sources[0]].last_generated_sample is not None else None
+                for indexer in valid_indexers
+            ]
+
+            utils.write_indexer_reputations(
+                outfile=f"indexers_{constants.NUMBER_OF_MALICIOUS_SOURCES}.csv",
+                array_indexers=valid_indexers,
+                data_values=data_of_indexers,
+                current_time=current_time,
+            )
 
             # Update reputation of Oracles ######## PASS IN THE DEVIATIONS
             for _o_id_request, _o in enumerate(selected_oracles):
@@ -394,7 +368,7 @@ if __name__ == "__main__":
                     header="<<<<<< End of Epoch Ranking >>>>>>", verbose=False, candidates_idx=candidates_indices
                 )
                 printRanking(header="Banlist:", banned=True)
-                printOracles(header="Oracles:")
+                # printOracles(header="Oracles:")
 
             # To ensure it is not used anymore and has to be reinitialized
             del candidates_indices
@@ -402,12 +376,13 @@ if __name__ == "__main__":
             del sources_trusted_idx
 
             # Report onto the file
+
             avg_reputation_benign = (
                 (
                     float(sum([x.reputation for x in (list(Indexers.values()) + Banlist) if x.trusted]))
                     / float(counter_indexers_created - counter_indexers_malign)
                 )
-                if counter_indexers_created
+                if counter_indexers_created and counter_indexers_malign != counter_indexers_created
                 else 0.0
             )
             avg_reputation_malign = (
@@ -421,7 +396,7 @@ if __name__ == "__main__":
             utils.write_simulation_result(
                 outfile=outfile,
                 mode_name=Mode.ZONIA,
-                epoch=epoch,
+                current_time=current_time,
                 fail_counter=counter_fail,
                 consolidated_result=counter_sequential_fail >= constants.CONTRACT_READS,
                 counter_indexers_created=counter_indexers_created,
@@ -432,7 +407,8 @@ if __name__ == "__main__":
                 avg_reputation_benign=avg_reputation_benign,
                 avg_reputation_malign=avg_reputation_malign,
             )
-
+            # raise('end')
+            current_time = utils.get_next_request_timestamp(current_time)
     # EPOCH END
 
     if constants._DEBUG_ and False:

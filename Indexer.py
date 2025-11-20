@@ -37,7 +37,7 @@ class Indexer:
             self.indexed_sources.append(source_id)
 
     # Return a list of producers to reply to the current query
-    def selectProducers(self, epoch, policy=constants.INDEXER_POLICY):
+    def select_producers(self, current_time, policy=constants.INDEXER_POLICY):
         num_producers_to_select = min(constants.INDEXER_MAX_PRODUCERS_REQUEST, len(self.indexed_sources))
 
         if policy == constants.INDEXER_POLICY_RANDOM:
@@ -51,7 +51,7 @@ class Indexer:
             selected = []  # This must never happen
 
         for _prod_idx in selected:
-            Producers[_prod_idx].last_request = epoch
+            Producers[_prod_idx].last_request = current_time
 
         self.selected_producers = selected
         return selected
@@ -75,14 +75,7 @@ class Indexer:
         head = "Trusted" if self.trusted else "Unstrusted"
         if not verbose:
             print(
-                "INDEXER "
-                + str(self.idx)
-                + " ("
-                + str(len(self.indexed_sources))
-                + " prod) - "
-                + head
-                + " - "
-                + str(round(self.reputation * 100, 1))
+                f"Indexer {str(self.idx)} - {self.indexed_sources} - {str(round(self.reputation * 100, 1))}"
             )
         else:
             print(
@@ -104,8 +97,10 @@ class Indexer:
             for prod_id in self.selected_producers:
                 Producers[prod_id].print_self(verbose=verbose)
 
+
 # GLOBAL DICTIONARY OF INDEXERS
 Indexers: Dict[int, Indexer] = {}
+
 
 # Factory method to create a new Indexer and add it to the Indexers
 def generateNewIndexer(trusted=True, owner=0):

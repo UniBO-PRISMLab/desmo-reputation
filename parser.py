@@ -14,12 +14,19 @@ def parse_args():
         default=constants.REPUTATION_MIN,
         help="Minimum reputation value before banning an actor",
     )
+    
+    parser.add_argument(
+        "--number_of_sources",
+        type=int,
+        default=constants.NUMBER_OF_SOURCES,
+        help="Number of sources",
+    )
 
     parser.add_argument(
-        "--ratio_malicious_indexers",
-        type=float,
-        default=constants.RATIO_MALICIOUS_INDEXERS,
-        help="Ratio of malicious indexers",
+        "--number_malicious_sources",
+        type=int,
+        default=constants.NUMBER_OF_MALICIOUS_SOURCES,
+        help="Number of malicious sources",
     )
 
     parser.add_argument(
@@ -36,7 +43,7 @@ def parse_args():
 
     parser.add_argument("--algo", type=int, default=constants.ALGO, help="Algorithm selection ID")
 
-    parser.add_argument("--arrival_rate", type=str, default=constants.ARRIVAL_RATE, help="Arrival rate of requests")
+    parser.add_argument("--arrival_rate", type=str, default=constants.ARRIVAL_RATE_IN_SEC, help="Arrival rate of requests")
 
 
     parser.add_argument(
@@ -62,30 +69,9 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--farmers_ratio",
-        type=float,
-        default=constants.FARMERS_RATIO,
-        help="Ratio of producers/indexers belonging to farmers",
-    )
-
-    parser.add_argument(
-        "--insurance_ratio",
-        type=float,
-        default=constants.INSURANCE_RATIO,
-        help="Ratio of producers/indexers belonging to insurance",
-    )
-
-    parser.add_argument(
-        "--other_ratio",
-        type=float,
-        default=constants.OTHER_RATIO,
-        help="Ratio of producers/indexers belonging to other entities",
-    )
-
-    parser.add_argument(
         "--attack_duration",
         type=int,
-        default=constants.ATTACK_DURATION,
+        default=constants.ATTACK_DURATION_IN_SEC,
         help="Duration (in epochs) of the attack phase",
     )
 
@@ -96,7 +82,7 @@ def apply_arguments_to_constants(args):
     Applies parsed arguments to constants and relevant class attributes.
     """
     constants.REPUTATION_MIN = args.reputation_min
-    constants.RATIO_MALICIOUS_INDEXERS = args.ratio_malicious_indexers
+    constants.NUMBER_OF_MALICIOUS_SOURCES = args.number_malicious_sources
     constants.TOLERANCE = args.tolerance
     constants.FILE_OUT = args.file_out
     constants.ALGO = args.algo
@@ -105,11 +91,8 @@ def apply_arguments_to_constants(args):
     constants.TRUTH = args.truth
     constants.CONTRACT_READS = args.contract_reads
     constants.THRESHOLD = args.threshold
-    constants.FARMERS_RATIO = args.farmers_ratio
-    constants.INSURANCE_RATIO = args.insurance_ratio
-    constants.OTHER_RATIO = args.other_ratio
     constants.ATTACK_DURATION = args.attack_duration
-
+    constants.NUMBER_OF_SOURCES = args.number_of_sources
     Indexer.ALPHA = args.alpha
     Source.ALPHA_SOURCE = args.alpha
     Oracle.ALPHA = args.alpha

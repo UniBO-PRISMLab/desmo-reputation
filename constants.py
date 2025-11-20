@@ -3,6 +3,8 @@ from mode import Mode
 _TESTING_ = False
 _DEBUG_ = False
 
+INDEXER_REP_FILE = "indexer_rep.py"
+FILE_OUT = "ZONIA_Test.csv"
 
 MODE = Mode.ZONIA
 # ALGORITHMS
@@ -10,7 +12,7 @@ ALGO_AVG = 0         # Computes only the average
 ALGO_MED = 1         # Computes the median and uses the ranking
 ALGO_REP = 2         # Our reputation algorithm
 ALGO_LIST = ["Average", "Median + Ranking", "Reputation"]
-
+FILE_PREFIX = "NWS"
 # Truth inference algorithm
 TRUTH_AVG = 0
 TRUTH_MED = 1
@@ -25,36 +27,32 @@ O = 20
 if _TESTING_:
     O = 10
 
+NUMBER_OF_SOURCES = 12
+NUMBER_OF_MALICIOUS_SOURCES = 0
 # Total number of indexers
-I = 20
-if _TESTING_:
-    I = 20
+# I = 8
+# if _TESTING_:
+#     I = 8
 
-# Total number of sources
-S = 200
-if _TESTING_:
-    S = 200
+# # Total number of sources
+# S = I
+# if _TESTING_:
+#     S = I
 
-# Number of Epochs (the ratio for arrivals is the ratio of epochs in which we add up sources)
-N_EPOCHS = 1000
-if _TESTING_:
-    N_EPOCHS = 60
 
 # Ratio of sources present at cold start (between 0 and 1)
 RATIO_COLD_START = 1
 
 # Ratio of malicious Indexers (if there is any, then malicious sources will only go into malicious indexers and good sources into good indexers)
-RATIO_MALICIOUS_INDEXERS = 0
 VERTICAL_ATTACK = True #Vertical attack forces all malicious sources to go into malicious indexers, otherwise they distribute evenly
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
-RATIO_MALICIOUS_SOURCES = RATIO_MALICIOUS_INDEXERS * 2
 
 # Ratio of malicious sources within the remaining ones (between 0 and 1)
 RATIO_MALICIOUS_ORACLES = 0
 
-# This should be one of 'uniform' or 'bursty'
-ARRIVAL_RATE = 'bursty'
+#one message each 5 min
+ARRIVAL_RATE_IN_SEC = (1/900)
 
 # Number of oracles chosen for a single request
 O_req = 5
@@ -67,16 +65,14 @@ if _TESTING_:
     S_req = 3
 
 # Threshold below which a source is banned
-REPUTATION_MIN = -0.40
+REPUTATION_MIN = -20#-0.40
 
 # FILE where to write the results
-FILE_OUT = "REP.csv"
-GROUND_TRUTH = 17
-FALSE_TRUTH = 50
+FALSE_TRUTH = 80
 
-THRESHOLD = 42
+THRESHOLD = 45
 # What is the maximum error for a measurement that generates a score of 0 (a higher error value corresponds to a negative score) !CONST
-TOLERANCE = 3.0         # Tolerance for the distnace from ground truth
+TOLERANCE = 4.0         # Tolerance for the distnace from ground truth
 
 
 # Initial reputation of a new oracle
@@ -134,9 +130,14 @@ SOURCE_SOURCE_REPUTATION_INIT = 0
 
 TRUTH_INFERENCE = "greater_equal"
 CONTRACT_READS = 5
-THRESHOLD = 30
+THRESHOLD = 50
 
 FARMERS_RATIO = 0.5
 INSURANCE_RATIO = 0.5
 OTHER_RATIO = 0.05
-ATTACK_DURATION = 30
+ATTACK_DURATION_IN_SEC = 3600*4
+
+TRACES_PATH = "./assets/traces"
+ATTACKER_VARIANCE = 3.0
+DEFAULT_MAX_RECURSION_FOR_TIMESTAMP_SEARCH = 10
+MAX_DATA_STALENESS_IN_SEC = 7200

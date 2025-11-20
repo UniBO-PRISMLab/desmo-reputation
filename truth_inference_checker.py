@@ -10,5 +10,5 @@ truth_inference_checkers: Dict[str, TruthInferenceFunction] = {
     "less_than": lambda value, threshold=constants.THRESHOLD: value < threshold,
     "less_equal": lambda value, threshold=constants.THRESHOLD: value <= threshold,
     "equal": lambda value, threshold=constants.THRESHOLD: value == threshold,
-    "within_range": lambda value, threshold=constants.GROUND_TRUTH: abs(value - threshold) <= constants.TOLERANCE,
+    # "within_range": lambda value, threshold=constants.GROUND_TRUTH: abs(value - threshold) <= constants.TOLERANCE,
 }
