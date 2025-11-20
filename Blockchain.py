@@ -64,9 +64,76 @@ def calculateWaitingBlocks(base_fee):
         return 2 + ((base_fee - 25.0) // 15) # floor
     else:
         return 6 + ((base_fee - 100.0) // 10) # floor
-    
 
-def generateTrace(name):
+
+
+
+def generateRegressionTrace(name):
+
+    transaction_map = {}
+    # Make the main map with key: transaction HASH
+    # values: block number, gas price, priority fee
+    for tracefile in sorted(os.listdir(f"traces_chain/merged/{name}_with_prices")):
+        if tracefile.startswith(name) and "transactions" in tracefile:
+            with open(os.path.join(f"traces_chain/merged/{name}_with_prices", tracefile), "r") as f:
+                print(f"Processing trace file: {tracefile}")
+                for _line in f.readlines():
+
+                    # Skip title line
+                    if _line.startswith("block_num"):
+                        continue
+                    line = _line.strip().split(",")
+                    if line[16] == "True" and line[13] == "2" and float(line[12]) < float(line[15]): # if the transaction is valid and it follows the EIP-1559 standard and if the priofee + base is actually used
+                        transaction_map[line[2]] = {
+                            "block_id": int(line[0]),
+                            "gas_price": float(line[12]) / 1e9,  #
+                            "priority_fee": float(line[14]) / 1e9,  # Convert to Chain-specific Gwei
+                            "gas_used": int(line[11])
+                        }
+
+    base_fee_block_map = {}
+    # We produce a map with key: block number, value
+    if os.path.exists(f"traces_chain/merged/{name}_with_prices/{name}_merged_blocks_sorted.csv"):
+        with open(os.path.join(f"traces_chain/merged/{name}_with_prices", f"{name}_merged_blocks_sorted.csv"), "r") as f:
+            print (f"Processing block file: {name}_merged_blocks_sorted.csv")
+            base_fee_old = 0.0
+            for _line in f.readlines():
+                # Skip title line
+                if _line.startswith("block_hash"):
+                    continue
+                line = _line.strip().split(",")
+                base_fee = float(line[6]) / 1e9  # Convert to Chain-specific Gwei
+                if not base_fee_old == 0.0:
+                    base_fee_block_map[int(line[2])] = {"base_fee": base_fee, "derivative": base_fee - base_fee_old}
+                base_fee_old = base_fee
+    
+    # Parse the "mempool file" and add the waiting time.
+    if os.path.exists(f"traces_chain/merged/{name}_with_prices/{name}_mempool_trace.csv"):
+        with open(os.path.join(f"traces_chain/merged/{name}_with_prices", f"{name}_mempool_trace.csv"), "r") as f:
+            print (f"Processing mempool file: {name}_mempool_trace.csv")
+            for _line in f.readlines():
+                # Skip title line
+                if _line.startswith("timestamp_ms"):
+                    continue
+                line = _line.strip().split(",")
+                tx_hash = line[1]
+                if tx_hash in transaction_map.keys():
+                    block_id = transaction_map[tx_hash]["block_id"]
+                    if block_id in base_fee_block_map.keys():
+                        base_fee = base_fee_block_map[block_id]["base_fee"]
+                        derivative = base_fee_block_map[block_id]["derivative"]
+                        transaction_map[tx_hash]["base_fee"] = base_fee
+                        transaction_map[tx_hash]["waiting_time"] = line[16]
+                        transaction_map[tx_hash]["base_fee_derivative"] = derivative
+    
+    with open(f"traces_chain/{name}_regression_trace.json", "w") as f:
+        print(f"Writing regression trace for {name} with {len(transaction_map)} transactions.")
+        json.dump(transaction_map, f, indent=4)
+                        
+
+  
+
+def generateTrace(name, real_base_fee = True):
     """
     Generates a trace for the blockchain.
     This is a placeholder function that can be modified to implement actual trace generation logic.
@@ -77,6 +144,7 @@ def generateTrace(name):
     :mult: A multiplier for conversion into ETH
     """
     trace = {}
+    base_fee_block_map = {}
 
     first_block_time = 0
     block_progressive = 0
@@ -91,8 +159,23 @@ def generateTrace(name):
     waiting_blocks = 0.0
     coin_price = 0.0
 
+    # A couple of counters to keep track of the success in fetching the base fee
+    transactions_total = 0
+    transactions_with_base_fee = 0
+
+    # If using the real base fee, we produce a map with key: block number, value: base fee
+    if os.path.exists(f"traces_chain/merged/{name}_with_prices/{name}_merged_blocks_sorted.csv") and real_base_fee:
+        with open(os.path.join(f"traces_chain/merged/{name}_with_prices", f"{name}_merged_blocks_sorted.csv"), "r") as f:
+            print (f"Processing block file: {name}_merged_blocks_sorted.csv")
+            for _line in f.readlines():
+                # Skip title line
+                if _line.startswith("block_hash"):
+                    continue
+                line = _line.strip().split(",")
+                base_fee_block_map[int(line[2])] = float(line[6]) / 1e9  # Convert to Chain-specific Gwei
+
     for tracefile in sorted(os.listdir(f"traces_chain/merged/{name}_with_prices")):
-        if tracefile.startswith(name):
+        if tracefile.startswith(name) and "transactions" in tracefile:
             with open(os.path.join(f"traces_chain/merged/{name}_with_prices", tracefile), "r") as f:
                 print(f"Processing trace file: {tracefile}")
                 for _line in f.readlines():
@@ -103,7 +186,6 @@ def generateTrace(name):
                     line = _line.strip().split(",")
 
                     block_time = float(line[20])
-                    #block_time = datetime.strptime(line[20], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc).timestamp() #XXX
                     
                     # It's the first block
                     if block_num == 0:
@@ -113,7 +195,7 @@ def generateTrace(name):
 
                     # It is a new block
                     if int(line[0]) != block_num:
-                        # update numbers and append to dict
+                        # update aggregation numbers and append to dict
                         if tx_count > 0:
                             trace[block_progressive] = {
                                 "block_time": block_time - first_block_time,
@@ -146,14 +228,20 @@ def generateTrace(name):
                     # Record transaction data
                     block_num = int(line[0])
                     if line[16] == "True" and line[13] == "2": # if the transaction is valid and it follows the EIP-1559 standard
-                        if float(line[12]) < float(line[15]): # if the max fee is not used, then the base fee is the difference between the gas price and max prio fee
+
+                        # Calculate the base fee
+                        if real_base_fee and block_num in base_fee_block_map:
+                            temp_base_fee = base_fee_block_map[block_num]
+                            transactions_with_base_fee += 1
+                        elif float(line[12]) < float(line[15]): # if the max fee is not used, then the base fee is the difference between the gas price and max prio fee
                             temp_base_fee = (float(line[12]) - float(line[14]))  / 1e9
-                        else:
-                            if temp_base_fee == 0.0:
-                                continue
+                        elif temp_base_fee == 0.0:
+                            continue # skip this transaction if we don't have a base fee
+                        # In case all these conditions fail, we use the last known base fee
+                        transactions_total += 1
+                    
                         tx_count += 1
-                        #curr_base_fee = (float(line[12]) - float(line[14]))  / 1e9  
-                        # # Convert to Chain-specific Gwei, base fee is the difference between the gas price and max prio fee if the max fee is not used, otherwise
+                        # Convert to Chain-specific Gwei, base fee is the difference between the gas price and max prio fee if the max fee is not used, otherwise
                         base_fee += temp_base_fee
                         gas_price += float(line[12]) / 1e9  # Convert to Chain-specific Gwei
                         max_fee += float(line[15]) / 1e9  # Convert to Chain-specific Gwei
@@ -161,6 +249,7 @@ def generateTrace(name):
                         coin_price += float(line[25])  # Coin price in USD
     with open(f"traces_chain/{name}_trace.json", "w") as f:
         json.dump(trace, f, indent=4)
+    print(f"Generated trace for {name} with {len(trace)} blocks, {transactions_total} transactions processed and {transactions_with_base_fee} with base fee.")
     
 
 def selectRelayChain(timestamp):
@@ -200,7 +289,7 @@ def selectRelayChain(timestamp):
         raise ValueError("No blockchains available to select as relay chain.")
     return relay_chain
 
-def compute_optimal_response_timestamp_and_cost(timestamp_now):
+def compute_optimal_response_timestamp_and_cost(timestamp_now, time_of_the_day):
     """
     Computes the optimal response timestamp and cost based on the current timestamp.
     
@@ -211,7 +300,7 @@ def compute_optimal_response_timestamp_and_cost(timestamp_now):
     max_objective = 0.0
 
     for _relay_chain in Blockchains.values():
-        _timestamp, _cost = _relay_chain.compute_response_timestamp_and_cost(timestamp_now)
+        _timestamp, _cost = _relay_chain.compute_response_timestamp_and_cost(timestamp_now, time_of_the_day)
         _delay = (_timestamp - timestamp_now) if _timestamp > timestamp_now else 0.0
         _objective = utils.calculateObjectiveFunctionValue(_cost, _delay)
         if _objective > max_objective:
@@ -278,7 +367,7 @@ class Blockchain:
                 return block_id
         return None
     
-    def compute_response_timestamp_and_cost(self, timestamp_now):
+    def compute_response_timestamp_and_cost(self, timestamp_now, time_of_the_day):
         """
         Computes the timestamp for the response based on the current timestamp.
         
@@ -286,20 +375,22 @@ class Blockchain:
         :return: The computed response timestamp and the cost.
         """
 
-        last_block_id = self.find_previous_block_id(timestamp_now)
+        last_block_id = self.find_previous_block_id(timestamp_now + time_of_the_day)
         if last_block_id is not None:
             commitreveal_block_id = last_block_id + 1 + self.trace[last_block_id]["waiting_blocks"]
             if commitreveal_block_id in self.trace:
                 score_block_id = commitreveal_block_id + 1 + self.trace[commitreveal_block_id]["waiting_blocks"]
                 if score_block_id in self.trace:
-                    return self.trace[score_block_id]["block_time"], self.trace[score_block_id]["base_fee"] * self.trace[score_block_id]["coin_price"] # FIXME substitute base_fee with gas_cost?
+                    return self.trace[score_block_id]["block_time"] - time_of_the_day, self.trace[score_block_id]["base_fee"] * self.trace[score_block_id]["coin_price"] # FIXME substitute base_fee with gas_cost?
                 
         return timestamp_now + self.average_block_time * 2, self.trace[last_block_id]["base_fee"] * self.trace[last_block_id]["coin_price"]
     
 if __name__ == "__main__":
-    generateTrace("ethereum")
-    generateTrace("avalanche")
-    generateTrace("polygon")
-    generateTrace("optimism")
-    generateTrace("binance")
+    # generateTrace("ethereum")
+    # generateTrace("avalanche")
+    # generateTrace("polygon")
+    # generateTrace("optimism")
+    # generateTrace("binance")
+    generateRegressionTrace("ethereum")
+
 

@@ -92,7 +92,10 @@ FILE_OUT = "REP.csv"
 # Favourite Chain
 # 0 means that the favourite chain is not used, otherwise it is the index of the chain in the list of chains
 # -1 means sequential (ideal) which means that the waiting time is always zero
-FAV_CHAIN = 0 
+FAV_CHAIN = 0
+
+# Artificail Delay added to each request to simulate network latency (in seconds)
+ARTIFICIAL_DELAY = 0.0
 
 # Paramter for the Convex Combination between cost [0] and time [1]
 COST_TIME_PARAM = 0.5

@@ -75,6 +75,13 @@ def parse_args():
         help="Parameter for the convex combination between cost and time (between 0 and 1)",
     )
 
+    parser.add_argument(
+        "--artificial_delay",
+        type=float,
+        default=constants.ARTIFICIAL_DELAY,
+        help="Artificial delay added to each request to simulate network latency (in seconds)",
+    )
+
     return parser.parse_args()
 
 def apply_arguments_to_constants(args):
@@ -92,6 +99,7 @@ def apply_arguments_to_constants(args):
     constants.B = args.blockchain_num
     constants.FAV_CHAIN = args.fav_chain
     constants.COST_TIME_PARAM = args.cost_time_param
+    constants.ARTIFICIAL_DELAY = args.artificial_delay
 
     Indexer.ALPHA = args.alpha
     Source.ALPHA_SOURCE = args.alpha

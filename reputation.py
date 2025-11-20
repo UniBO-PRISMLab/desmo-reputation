@@ -367,14 +367,14 @@ if __name__ == "__main__":
                             )
 
                     # Calculate timestamp of the response with the selected chain (and, cosequently, the cost and the delay)
-                    response_timestamp, actual_cost = relay_chain.compute_response_timestamp_and_cost(next_event.timestamp + time_of_the_day)
+                    response_timestamp, actual_cost = relay_chain.compute_response_timestamp_and_cost(next_event.timestamp, time_of_the_day)
                     if constants.FAV_CHAIN == -1: # Sequential (IDEAL)
-                        response_timestamp = next_event.timestamp
+                        response_timestamp = next_event.timestamp + constants.ARTIFICIAL_DELAY
                     actual_delay = response_timestamp - next_event.timestamp - time_of_the_day
                     actual_objective = utils.calculateObjectiveFunctionValue(actual_cost, actual_delay)
 
                     # Calculate timestamp of the response with the optimal chain (and, cosequently, the optimal cost and the delay, given the tradeoff parameter)
-                    optimal_response_timestamp, optimal_cost = Blockchain.compute_optimal_response_timestamp_and_cost(next_event.timestamp + time_of_the_day)
+                    optimal_response_timestamp, optimal_cost = Blockchain.compute_optimal_response_timestamp_and_cost(next_event.timestamp, time_of_the_day)
                     if constants.FAV_CHAIN == -1: # Sequential (IDEAL)
                         optimal_response_timestamp = next_event.timestamp
                     optimal_delay = optimal_response_timestamp - next_event.timestamp - time_of_the_day
@@ -386,7 +386,6 @@ if __name__ == "__main__":
                     EventTimelineManager.add_event(newEvent)
                     if constants._DEBUG_:
                         print(f"----> Response timestamp will be at: {newEvent.timestamp} for request {next_event.idx}.")
-
                     # Add the transaction to the relay chain
                     relay_chain.add_transaction(next_event.idx)
                 
